@@ -15,7 +15,7 @@ With optional API keys you can unlock additional features step by step:
 - **5 Customizable Story Elements** — Pick from 30 options each for Main Character, Supporting Character, Universe, Place, and Object — or create your own custom entries with name, description, and image
 - **Text-to-Speech** — Convert stories to audio via ElevenLabs with configurable voice and model
 - **Tonie.box Integration** — Upload generated audio directly to a Creative Tonie
-- **Multi-Language UI** — Available in German, English, French, Spanish, Italian, and Turkish
+- **Multi-Language UI** — Available in: 🇩🇪 Deutsch, 🇬🇧 English, 🇫🇷 Français, 🇪🇸 Español, 🇮🇹 Italiano, 🇹🇷 Türkçe
 - **Cross-Platform** — Runs on Desktop (Windows, macOS, Linux) and Android
 
 ## Screenshots
@@ -33,8 +33,8 @@ With optional API keys you can unlock additional features step by step:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/nicokimmel/AIStories.git
-cd AIStories
+git clone https://github.com/TheApo/aiStories.git
+cd aiStories
 ```
 
 ### 2. Configuration
