@@ -1,0 +1,7 @@
+CHATGPT_API_KEY=Dein ChatGPT API Key
+GEMINI_API_KEY=Dein Gemini API Key
+ELEVENLABS_API_KEY=Dein ELEVENLABS_API_KEY
+ELEVENLABS_VOICE_ID=Deine ELEVENLABS_Voice ID wie z.B. YeeVW65klONqeKOpqQQo
+ELEVENLABS_MODEL_ID=eleven_multilingual_v2
+TONIES_USERNAME=Dein Username zur Anmeldung in der Tonies Cloud
+TONIES_PASSWORD=Dein Passwort zur Anemdlung in der Tonies Cloud

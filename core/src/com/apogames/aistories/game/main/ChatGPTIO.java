@@ -1,0 +1,322 @@
+package com.apogames.aistories.game.main;
+
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Net.HttpMethods;
+import com.badlogic.gdx.Net.HttpRequest;
+import com.badlogic.gdx.Net.HttpResponse;
+import com.badlogic.gdx.Net.HttpResponseListener;
+import com.badlogic.gdx.net.HttpRequestBuilder;
+import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class ChatGPTIO {
+    public static final String LLM_MODEL_MINI = "gpt-5-mini";
+    public static final String LLM_MODEL_GEMINI = "gemini-3-flash-preview";
+    public static String API_KEY;
+    public static String GEMINI_API_KEY;
+    private final String API_URL = "https://api.openai.com/v1/chat/completions";
+    private final MainInterface main;
+    private final List<Map<String, String>> conversationHistory;
+    private final Gson gson = new Gson();
+    @Getter
+    @Setter
+    private String llm;
+
+    // Cache zum Speichern der bereits generierten Bilder (z.B. nach Charakter oder Abschnitt-ID)
+    private final Map<String, String> imageCache = new HashMap<>();
+
+    public ChatGPTIO(MainInterface main) {
+        this.main = main;
+        conversationHistory = new ArrayList<>();
+        this.llm = LLM_MODEL_MINI;
+        this.reset();
+    }
+
+    private boolean isGeminiModel() {
+        return llm != null && llm.startsWith("gemini");
+    }
+
+    private void sendMessage(String message) {
+        this.main.setRunning(Running.CREATE_STORY);
+
+        // Add the user's message to the conversation history
+        Map<String, String> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        userMessage.put("content", message);
+        conversationHistory.add(userMessage);
+
+        if (isGeminiModel()) {
+            sendGeminiMessage();
+        } else {
+            sendOpenAIMessage();
+        }
+    }
+
+    private void sendOpenAIMessage() {
+        Map<String, Object> params = new HashMap<>();
+        params.put("model", llm);
+        params.put("messages", conversationHistory);
+        params.put("temperature", 1);
+        if (llm.startsWith("gpt-5")) {
+            params.put("max_completion_tokens", 4096);
+        } else {
+            params.put("max_tokens", 4096);
+        }
+
+        HttpRequestBuilder builder = new HttpRequestBuilder();
+        HttpRequest request = builder.newRequest()
+                .method(HttpMethods.POST)
+                .url(API_URL)
+                .timeout(90000)
+                .header("Authorization", "Bearer " + API_KEY)
+                .header("Content-Type", "application/json")
+                .content(gson.toJson(params))
+                .build();
+
+        Gdx.net.sendHttpRequest(request, new HttpResponseListener() {
+            @Override
+            public void handleHttpResponse(HttpResponse httpResponse) {
+                String responseStr = httpResponse.getResultAsString();
+                try {
+                    Map<String, Object> response = gson.fromJson(responseStr, Map.class);
+                    if (response == null) {
+                        Gdx.app.error("HTTP", "Failed to parse response " + responseStr);
+                        return;
+                    }
+                    List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+                    if (choices != null && !choices.isEmpty()) {
+                        LinkedTreeMap<String, String> messages = (LinkedTreeMap<String, String>) choices.get(0).get("message");
+                        if (messages != null && !messages.isEmpty()) {
+                            String content = messages.get("content");
+                            Map<String, String> gptMessage = new HashMap<>();
+                            gptMessage.put("role", "assistant");
+                            gptMessage.put("content", content);
+                            main.setTextForTextArea(content);
+                            conversationHistory.add(gptMessage);
+                        }
+                    }
+                } catch (Exception e) {
+                    Gdx.app.error("HTTP", "Error processing response", e);
+                }
+                main.setRunning(Running.NONE);
+            }
+
+            @Override
+            public void failed(Throwable t) {
+                Gdx.app.error("HTTP", "Request Failed", t);
+                main.setRunning(Running.NONE);
+            }
+
+            @Override
+            public void cancelled() {
+                Gdx.app.log("HTTP", "Request Cancelled");
+                main.setRunning(Running.NONE);
+            }
+        });
+    }
+
+    private void sendGeminiMessage() {
+        // Build Gemini request format
+        Map<String, Object> params = new HashMap<>();
+
+        // Convert conversation history to Gemini format
+        List<Map<String, Object>> contents = new ArrayList<>();
+        String systemText = null;
+
+        for (Map<String, String> msg : conversationHistory) {
+            String role = msg.get("role");
+            String content = msg.get("content");
+
+            if ("system".equals(role)) {
+                systemText = content;
+                continue;
+            }
+
+            Map<String, Object> geminiMsg = new HashMap<>();
+            // Gemini uses "model" instead of "assistant"
+            geminiMsg.put("role", "assistant".equals(role) ? "model" : role);
+
+            List<Map<String, String>> parts = new ArrayList<>();
+            Map<String, String> textPart = new HashMap<>();
+            textPart.put("text", content);
+            parts.add(textPart);
+            geminiMsg.put("parts", parts);
+
+            contents.add(geminiMsg);
+        }
+
+        params.put("contents", contents);
+
+        // System instruction as separate field
+        if (systemText != null) {
+            Map<String, Object> systemInstruction = new HashMap<>();
+            List<Map<String, String>> sysParts = new ArrayList<>();
+            Map<String, String> sysTextPart = new HashMap<>();
+            sysTextPart.put("text", systemText);
+            sysParts.add(sysTextPart);
+            systemInstruction.put("parts", sysParts);
+            params.put("systemInstruction", systemInstruction);
+        }
+
+        // Generation config
+        Map<String, Object> genConfig = new HashMap<>();
+        genConfig.put("temperature", 1);
+        genConfig.put("maxOutputTokens", 4096);
+        params.put("generationConfig", genConfig);
+
+        String geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + llm + ":generateContent?key=" + GEMINI_API_KEY;
+
+        HttpRequestBuilder builder = new HttpRequestBuilder();
+        HttpRequest request = builder.newRequest()
+                .method(HttpMethods.POST)
+                .url(geminiUrl)
+                .timeout(90000)
+                .header("Content-Type", "application/json")
+                .content(gson.toJson(params))
+                .build();
+
+        Gdx.net.sendHttpRequest(request, new HttpResponseListener() {
+            @Override
+            public void handleHttpResponse(HttpResponse httpResponse) {
+                String responseStr = httpResponse.getResultAsString();
+                try {
+                    Map<String, Object> response = gson.fromJson(responseStr, Map.class);
+                    if (response == null) {
+                        Gdx.app.error("HTTP", "Failed to parse Gemini response " + responseStr);
+                        return;
+                    }
+
+                    // Gemini response: candidates[0].content.parts[0].text
+                    List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
+                    if (candidates != null && !candidates.isEmpty()) {
+                        Map<String, Object> candidateContent = (Map<String, Object>) candidates.get(0).get("content");
+                        if (candidateContent != null) {
+                            List<Map<String, String>> parts = (List<Map<String, String>>) candidateContent.get("parts");
+                            if (parts != null && !parts.isEmpty()) {
+                                String text = parts.get(0).get("text");
+                                // Store in OpenAI format for conversation history
+                                Map<String, String> assistantMessage = new HashMap<>();
+                                assistantMessage.put("role", "assistant");
+                                assistantMessage.put("content", text);
+                                main.setTextForTextArea(text);
+                                conversationHistory.add(assistantMessage);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    Gdx.app.error("HTTP", "Error processing Gemini response", e);
+                }
+                main.setRunning(Running.NONE);
+            }
+
+            @Override
+            public void failed(Throwable t) {
+                Gdx.app.error("HTTP", "Gemini request failed", t);
+                main.setRunning(Running.NONE);
+            }
+
+            @Override
+            public void cancelled() {
+                Gdx.app.log("HTTP", "Gemini request cancelled");
+                main.setRunning(Running.NONE);
+            }
+        });
+    }
+
+    public void sendAnotherMessage(String message) {
+        sendMessage(message);
+    }
+
+    public void reset() {
+        this.conversationHistory.clear();
+
+        Map<String, String> userMessage = new HashMap<>();
+        userMessage.put("role", "system");
+        userMessage.put("content", this.main.getPrompt().getSystemSetting());
+        conversationHistory.add(userMessage);
+    }
+
+
+
+    /**
+     * Diese Methode sendet einen Request an einen Bildgenerierungs-Endpunkt (z. B. DALL-E).
+     * @param sectionIdentifier Eine eindeutige Kennung für den Abschnitt bzw. Charakter (z. B. "mainCharacter").
+     *                          Wird als Schlüssel im Cache genutzt.
+     * @param sectionText Der Textabschnitt, der als Grundlage für die Bildgenerierung dienen soll.
+     */
+    public void sendImageRequest(String sectionIdentifier, String sectionText) {
+        // Falls bereits ein Bild für diesen Identifier existiert, verwende den Cache.
+        if (imageCache.containsKey(sectionIdentifier)) {
+            String imageUrl = imageCache.get(sectionIdentifier);
+            Gdx.app.log("Image", "Using cached image for " + sectionIdentifier + ": " + imageUrl);
+            main.onImageReceived(sectionIdentifier, imageUrl);
+            return;
+        }
+
+        // Prompt für die Bildgenerierung erstellen
+        String imagePrompt = "Create a small illustration for the following section of a children's story. " +
+                "Ensure that the main character appears consistently with previous illustrations. " +
+                "Section text: " + sectionText;
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("prompt", imagePrompt);
+        params.put("n", 1);                  // Anzahl der zu generierenden Bilder
+        params.put("size", "256x256");         // Gewünschte Bildgröße
+
+        // Endpunkt für die Bildgenerierung (z. B. DALL-E)
+        String imageApiUrl = "https://api.openai.com/v1/images/generations";
+
+        HttpRequestBuilder builder = new HttpRequestBuilder();
+        HttpRequest request = builder.newRequest()
+                .method(HttpMethods.POST)
+                .url(imageApiUrl)
+                .timeout(90000)
+                .header("Authorization", "Bearer " + API_KEY)
+                .header("Content-Type", "application/json")
+                .content(gson.toJson(params))
+                .build();
+
+        Gdx.net.sendHttpRequest(request, new HttpResponseListener() {
+            @Override
+            public void handleHttpResponse(HttpResponse httpResponse) {
+                String responseStr = httpResponse.getResultAsString();
+                Gdx.app.log("HTTP", "Response from image API: " + responseStr);
+
+                try {
+                    Map<String, Object> response = gson.fromJson(responseStr, Map.class);
+                    if (response == null) {
+                        Gdx.app.error("HTTP", "Failed to parse image response");
+                        return;
+                    }
+                    List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
+                    if (data != null && !data.isEmpty()) {
+                        // Nimm die URL des ersten generierten Bildes
+                        String imageUrl = (String) data.get(0).get("url");
+                        imageCache.put(sectionIdentifier, imageUrl);
+                        main.onImageReceived(sectionIdentifier, imageUrl);
+                    }
+                } catch(Exception e) {
+                    Gdx.app.error("HTTP", "Error processing image response", e);
+                }
+            }
+
+            @Override
+            public void failed(Throwable t) {
+                Gdx.app.error("HTTP", "Image request failed", t);
+            }
+
+            @Override
+            public void cancelled() {
+                Gdx.app.log("HTTP", "Image request cancelled");
+            }
+        });
+    }
+
+}
