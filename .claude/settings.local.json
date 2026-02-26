@@ -4,7 +4,8 @@
       "Bash(find:*)",
       "Bash(tail:*)",
       "WebSearch",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(./gradlew :core:compileJava:*)"
     ]
   }
 }

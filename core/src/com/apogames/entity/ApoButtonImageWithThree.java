@@ -69,7 +69,7 @@ public class ApoButtonImageWithThree extends ApoButton {
             if (!this.mouseOverText.isEmpty() && this.isBOver()) {
                 screen.getGlyphLayout().setText(this.getFont(), this.mouseOverText);
                 int width = (int) (screen.getGlyphLayout().width);
-                int height = 30;
+                int height = (int)(screen.getGlyphLayout().height) + 24;
                 int x = (int) (this.getXMiddle() + changeX - width / 2 - 10);
                 int y = (int) (this.getY() + changeY - 3 - height);
                 if (x < 5) {
@@ -81,8 +81,7 @@ public class ApoButtonImageWithThree extends ApoButton {
                     y = (int) (this.getY() + changeY + 3 + this.getHeight());
                 }
                 screen.spriteBatch.draw(this.mouseOverTextureRegion, x, y, width + 20, height);
-//				screen.drawString(this.mouseOverText, x + 11 + width/2f, y + 1, Constants.COLOR_WHITE, this.getFont(), DrawString.MIDDLE, false, false);
-                screen.drawString(this.mouseOverText, x + 10 + width / 2f, (int) (this.getY() + changeY - height / 2 - 3), Constants.COLOR_BLACK, this.getFont(), DrawString.MIDDLE, true, false);
+                screen.drawString(this.mouseOverText, x + 10 + width / 2f, y + height / 2f + 5, Constants.COLOR_BLACK, this.getFont(), DrawString.MIDDLE, true, false);
             }
             if (needNewSpriteBatch) {
                 screen.spriteBatch.end();

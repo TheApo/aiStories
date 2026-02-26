@@ -29,6 +29,8 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
     private boolean isPressed = false;
 
+    private String singleLlmName;
+
     private ArrayList<ObjectSelection> objectSelection;
 
     public CreateStory(final MainPanel game) {
@@ -46,6 +48,18 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         if (!hasOpenAI && !hasGemini) {
             getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setVisible(false);
             getMainPanel().getButtonByFunction(FUNCTION_LLM).setVisible(false);
+            this.singleLlmName = null;
+        } else if (hasOpenAI && hasGemini) {
+            this.singleLlmName = null;
+        } else {
+            getMainPanel().getButtonByFunction(FUNCTION_LLM).setVisible(false);
+            if (hasGemini) {
+                this.getMainPanel().getChatGPT().setLlm(ChatGPTIO.LLM_MODEL_GEMINI);
+                this.singleLlmName = ChatGPTIO.LLM_MODEL_GEMINI;
+            } else {
+                this.getMainPanel().getChatGPT().setLlm(ChatGPTIO.LLM_MODEL_MINI);
+                this.singleLlmName = ChatGPTIO.LLM_MODEL_MINI;
+            }
         }
 
         this.createObjectSelection();
@@ -246,7 +260,11 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         for (ApoButton button : this.getMainPanel().getButtons()) {
             button.render(this.getMainPanel());
             if (button.getFunction().equals(FUNCTION_LLM)) {
-                ((ApoButtonSwitch) (button)).renderText(getMainPanel(), 0, 0, this.getMainPanel().getChatGPT().getLlm());
+                if (button.isVisible()) {
+                    ((ApoButtonSwitch) (button)).renderText(getMainPanel(), 0, 0, this.getMainPanel().getChatGPT().getLlm());
+                } else if (this.singleLlmName != null) {
+                    getMainPanel().drawString(this.singleLlmName, button.getX() + button.getWidth() / 2f, button.getY() + button.getHeight() / 2f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, true);
+                }
             }
         }
     }

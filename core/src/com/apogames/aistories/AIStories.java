@@ -26,6 +26,10 @@ public class AIStories extends Game {
     }
 
     private void loadProperties() {
+        if (!Gdx.files.internal("config.properties").exists()) {
+            System.out.println("config.properties not found - starting without API keys");
+            return;
+        }
         Properties props = new Properties();
         try (InputStream input = Gdx.files.internal("config.properties").read()) {
             props.load(input);
@@ -39,8 +43,8 @@ public class AIStories extends Game {
             }
             ToniesAPI.USERNAME = props.getProperty("TONIES_USERNAME");
             ToniesAPI.PASSWORD = props.getProperty("TONIES_PASSWORD");
-        } catch (IOException ex) {
-            ex.printStackTrace();
+        } catch (Exception ex) {
+            System.out.println("Error loading config.properties: " + ex.getMessage());
         }
     }
 
