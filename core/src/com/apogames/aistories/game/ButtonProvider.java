@@ -146,6 +146,7 @@ public class ButtonProvider {
             button.setFont(AssetLoader.font20);
             this.game.getButtons().add(button);
 
+            // Audio controls below book (y=680)
             text = "";
             function = ListenStories.FUNCTION_PLAY;
             width = 64;
@@ -181,17 +182,18 @@ public class ButtonProvider {
             width = 450;
             height = 64;
             x = Constants.GAME_WIDTH / 2 - width / 2;
-            y = Constants.GAME_HEIGHT - 100;
+            y = Constants.GAME_HEIGHT - height - 30;
             button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "button_read");
             button.setFont(AssetLoader.font25);
             this.game.getButtons().add(button);
 
+            // Page navigation buttons below book (y=585)
             text = "";
             function = ListenStories.FUNCTION_NEXT_PAGE;
             width = 64;
             height = 64;
             x = Constants.GAME_WIDTH/2 + 200;
-            y = Constants.GAME_HEIGHT - height - 220;
+            y = 585;
             button = new ApoButtonImageThreeExtra(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "");
             ((ApoButtonImageThreeExtra)(button)).setExtra(ApoButtonImageThreeExtra.EXTRA.NEXT);
             this.game.getButtons().add(button);
@@ -201,17 +203,18 @@ public class ButtonProvider {
             width = 64;
             height = 64;
             x = Constants.GAME_WIDTH/2 - 200 - width;
-            y = Constants.GAME_HEIGHT - height - 220;
+            y = 585;
             button = new ApoButtonImageThreeExtra(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "");
             ((ApoButtonImageThreeExtra)(button)).setExtra(ApoButtonImageThreeExtra.EXTRA.PREV);
             this.game.getButtons().add(button);
 
+            // Font size buttons below book (y=585)
             text = "";
             function = ListenStories.FUNCTION_FONT_SMALLER;
             width = 64;
             height = 64;
             x = Constants.GAME_WIDTH/2 - width - 10;
-            y = Constants.GAME_HEIGHT - height - 220;
+            y = 585;
             button = new ApoButtonImageThreeExtra(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "");
             ((ApoButtonImageThreeExtra)(button)).setExtra(ApoButtonImageThreeExtra.EXTRA.MINUS);
             this.game.getButtons().add(button);
@@ -221,11 +224,12 @@ public class ButtonProvider {
             width = 64;
             height = 64;
             x = Constants.GAME_WIDTH/2 + 10;
-            y = Constants.GAME_HEIGHT - height - 220;
+            y = 585;
             button = new ApoButtonImageThreeExtra(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "");
             ((ApoButtonImageThreeExtra)(button)).setExtra(ApoButtonImageThreeExtra.EXTRA.PLUS);
             this.game.getButtons().add(button);
 
+            // Story navigation buttons at bottom
             text = "";
             function = ListenStories.FUNCTION_NEXT_STORY;
             width = 64;
@@ -246,14 +250,13 @@ public class ButtonProvider {
             ((ApoButtonImageThreeExtra)(button)).setExtra(ApoButtonImageThreeExtra.EXTRA.PREV);
             this.game.getButtons().add(button);
 
-
-            text = "READ";
+            // Tonie upload button - smaller, below book
+            text = "";
             function = ListenStories.FUNCTION_UPLOAD_TONIE;
-            width = 203;
-            height = 248;
+            width = 100;
+            height = 120;
             x = 70;
-            y = Constants.GAME_HEIGHT - height - 10;
-            //button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "button_upload");
+            y = 585;
             button = new ApoButtonImage(x, y, width, height, function, "", AssetLoader.tonieTextureRegion);
             button.setFont(AssetLoader.font20);
             this.game.getButtons().add(button);
@@ -285,7 +288,7 @@ public class ButtonProvider {
             width = 128;
             height = 64;
             x = Constants.GAME_WIDTH - width - 100;
-            y = Constants.GAME_HEIGHT - 220 - height;
+            y = 585;
             button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "button_delete");
             button.setFont(AssetLoader.font20);
             this.game.getButtons().add(button);

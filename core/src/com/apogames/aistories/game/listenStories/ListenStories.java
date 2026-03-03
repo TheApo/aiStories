@@ -3,9 +3,7 @@ package com.apogames.aistories.game.listenStories;
 import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
 import com.apogames.aistories.game.main.*;
-import com.apogames.aistories.game.objects.CustomEntity;
-import com.apogames.aistories.game.objects.EnumInterface;
-import com.apogames.aistories.game.objects.GameObjectives;
+import com.apogames.aistories.game.objects.*;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
@@ -72,7 +70,11 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     @Getter
     private final ChatGPTIO chatGPT = new ChatGPTIO(this);
 
-    private int changeY = 0;
+    private int currentSpread = 0;
+    private int pendingSpread = 0;
+
+    private final BookRenderer bookRenderer;
+    private final PageTurnAnimation pageAnimation = new PageTurnAnimation();
 
     private Running running = Running.NONE;
 
@@ -82,6 +84,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     public ListenStories(final MainPanel game) {
         super(game);
+        this.bookRenderer = new BookRenderer(game);
     }
 
     public void setNeededButtonsVisible() {
@@ -151,7 +154,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         Arrays.sort(this.fileImageHandles, (file1, file2) -> file1.name().compareToIgnoreCase(file2.name()));
 
         if (this.textArea == null) {
-            this.textArea = new TextArea(100, 100, 1200, 400, "TextArea", "");
+            this.textArea = new TextArea(0, 0, bookRenderer.getTextAreaWidth(), BookRenderer.PAGE_HEIGHT, "TextArea", "");
         }
         this.textArea.setFont(fontSize.getFont());
         this.setUpFont(0);
@@ -181,8 +184,136 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             go.setObjectives(resolveEntity(split[4], go.getObjectives(), this.getMainPanel().getCustomObjectives()));
             text = text.substring(text.indexOf(SEPARATOR_IN_FILE) + SEPARATOR_IN_FILE.length());
         }
-        this.changeY = 0;
-        this.textArea.setText(text);
+        this.currentSpread = 0;
+        this.pendingSpread = 0;
+        this.textArea.setText(cleanText(text));
+        processAndLayoutChapters();
+        updatePageButtonVisibility();
+    }
+
+    private String cleanText(String text) {
+        // Remove zero-width and invisible Unicode characters
+        text = text.replace("\u200B", "").replace("\u200C", "")
+                   .replace("\u200D", "").replace("\uFEFF", "");
+        // Non-breaking space → normal space
+        text = text.replace('\u00A0', ' ');
+        // Process line by line: remove # headers, trim, ensure blank line after headings
+        String[] lines = text.split("\n", -1);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            String original = lines[i].trim();
+            boolean isHeading = original.startsWith("#") || BookRenderer.isChapterHeading(original);
+            String line = original.replaceAll("^#+\\s*", "").trim();
+            if (i > 0) sb.append("\n");
+            sb.append(line);
+            // Ensure blank line after heading so body text is separated
+            if (isHeading) {
+                boolean nextIsEmpty = (i + 1 < lines.length && lines[i + 1].trim().isEmpty());
+                if (!nextIsEmpty) {
+                    sb.append("\n");
+                }
+            }
+        }
+        // Collapse multiple spaces
+        return sb.toString().replaceAll(" {2,}", " ");
+    }
+
+    private void processAndLayoutChapters() {
+        bookRenderer.getChapterLines().clear();
+        ArrayList<String> lines = this.textArea.getMyText();
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        com.badlogic.gdx.graphics.g2d.BitmapFont headingFont = this.fontSize.getNext(1).getFont();
+        float maxWidth = BookRenderer.TEXT_WIDTH;
+
+        for (int i = 0; i < lines.size(); i++) {
+            if (!BookRenderer.isChapterHeading(lines.get(i))) continue;
+
+            // Pad to page boundary
+            int posInPage = i % rowsPerPage;
+            if (posInPage != 0) {
+                int padding = rowsPerPage - posInPage;
+                for (int j = 0; j < padding; j++) {
+                    lines.add(i, "");
+                }
+                i += padding;
+            }
+
+            // Collect full heading text (TextArea may have wrapped across lines)
+            StringBuilder fullText = new StringBuilder(lines.get(i).trim());
+            int lastIdx = i;
+            for (int j = i + 1; j < lines.size(); j++) {
+                String next = lines.get(j).trim();
+                if (next.isEmpty() || BookRenderer.isChapterHeading(next)) break;
+                fullText.append(" ").append(next);
+                lastIdx = j;
+            }
+
+            // Strip "Kapitel" word, keep number
+            String heading = fullText.toString()
+                    .replaceFirst("(?i)(Kapitel|Chapter|Chapitre|Capitolo|Capítulo|Bölüm)\\s+", "");
+
+            // Remove old heading lines
+            for (int j = lastIdx; j >= i; j--) {
+                lines.remove(j);
+            }
+
+            // Re-wrap with heading font
+            ArrayList<String> wrapped = wrapTextForFont(heading, headingFont, maxWidth);
+            for (int j = 0; j < wrapped.size(); j++) {
+                lines.add(i + j, wrapped.get(j));
+                bookRenderer.getChapterLines().add(i + j);
+            }
+
+            // Ensure exactly 1 empty line after heading
+            int afterIdx = i + wrapped.size();
+            int emptyCount = 0;
+            while (afterIdx + emptyCount < lines.size() && lines.get(afterIdx + emptyCount).trim().isEmpty()) {
+                emptyCount++;
+            }
+            while (emptyCount > 1) {
+                lines.remove(afterIdx + emptyCount - 1);
+                emptyCount--;
+            }
+            if (emptyCount < 1) {
+                lines.add(afterIdx, "");
+            }
+
+            i = afterIdx; // loop will increment
+        }
+    }
+
+    private ArrayList<String> wrapTextForFont(String text, com.badlogic.gdx.graphics.g2d.BitmapFont font, float maxWidth) {
+        ArrayList<String> result = new ArrayList<>();
+        Constants.glyphLayout.setText(font, text);
+        if (Constants.glyphLayout.width <= maxWidth) {
+            result.add(text);
+            return result;
+        }
+        String[] words = text.split(" ");
+        StringBuilder current = new StringBuilder();
+        for (String word : words) {
+            String test = current.length() == 0 ? word : current + " " + word;
+            Constants.glyphLayout.setText(font, test);
+            if (Constants.glyphLayout.width > maxWidth && current.length() > 0) {
+                result.add(current.toString());
+                current = new StringBuilder(word);
+            } else {
+                current = new StringBuilder(test);
+            }
+        }
+        if (current.length() > 0) {
+            result.add(current.toString());
+        }
+        return result;
+    }
+
+    private void updatePageButtonVisibility() {
+        if (this.textArea == null || this.textArea.getMyText() == null) return;
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        boolean canGoBack = this.currentSpread > 0;
+        boolean canGoForward = (this.currentSpread + 1) * 2 * rowsPerPage < this.textArea.getMyText().size();
+        getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_PAGE).setVisible(canGoBack);
+        getMainPanel().getButtonByFunction(FUNCTION_NEXT_PAGE).setVisible(canGoForward);
     }
 
     private EnumInterface resolveEntity(String name, EnumInterface current, CustomEntity custom) {
@@ -379,7 +510,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void nextStory(int add) {
         this.stopMusic();
-        this.changeY = 0;
+        this.currentSpread = 0;
+        this.pendingSpread = 0;
 
         this.choosenReadStory += add;
 
@@ -448,17 +580,32 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private void nextPage(int add) {
-        if (this.changeY + add * this.textArea.getRows() >= 0 && this.changeY + add * this.textArea.getRows() < this.textArea.getMyText().size()) {
-            this.changeY += add * this.textArea.getRows();
+        if (pageAnimation.isAnimating()) return;
+
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        int newSpread = this.currentSpread + add;
+        int newLeftStart = newSpread * 2 * rowsPerPage;
+
+        if (newSpread >= 0 && newLeftStart < this.textArea.getMyText().size()) {
+            this.pendingSpread = newSpread;
+            if (add > 0) {
+                pageAnimation.start(PageTurnAnimation.Direction.FORWARD);
+            } else {
+                pageAnimation.start(PageTurnAnimation.Direction.BACKWARD);
+            }
+            Gdx.graphics.setContinuousRendering(true);
         }
     }
 
     private void setUpFont(int add) {
-        this.changeY = 0;
+        this.currentSpread = 0;
+        this.pendingSpread = 0;
         this.fontSize = this.fontSize.getNext(add);
         this.textArea.setAdd(this.fontSize.getAdd());
         this.textArea.setFont(this.fontSize.getFont());
         this.textArea.setText(this.textArea.getText());
+        processAndLayoutChapters();
+        updatePageButtonVisibility();
 
         Gdx.graphics.requestRendering();
     }
@@ -496,9 +643,18 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     @Override
     public void doThink(float delta) {
+        if (pageAnimation.isAnimating()) {
+            boolean finished = pageAnimation.update(delta);
+            if (finished) {
+                this.currentSpread = this.pendingSpread;
+                Gdx.graphics.setContinuousRendering(false);
+                updatePageButtonVisibility();
+            }
+            Gdx.graphics.requestRendering();
+        }
+
         if (this.nextText != null) {
             String text = this.nextText;
-            //Gdx.app.log("Text", "setText: " + text);
             this.setTextInTextArea(text);
 
             this.saveText(text);
@@ -529,97 +685,123 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     @Override
     public void render() {
+        // Background
         getMainPanel().spriteBatch.begin();
-
         getMainPanel().spriteBatch.draw(AssetLoader.backgroundTextureRegion, 0, 0);
-
         getMainPanel().spriteBatch.end();
 
-        Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
-        int width = 700;
-        getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
-        if (this.running != Running.CREATE_STORY) {
-            getMainPanel().getRenderer().setColor(Constants.COLOR_WHITE[0], Constants.COLOR_WHITE[1], Constants.COLOR_WHITE[2], 0.3f);
-            getMainPanel().getRenderer().roundedRect(Constants.GAME_WIDTH / 2f - width / 2f, Constants.GAME_HEIGHT - 200, width, 180, 10);
-        }
-        this.textArea.renderFilled(this.getMainPanel(), 0, 0);
+        // Book frame (cover, pages, spine)
+        bookRenderer.renderBookFrame();
 
-        getMainPanel().getRenderer().end();
-        Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
-
-        getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Line);
-        if (this.running != Running.CREATE_STORY) {
-            getMainPanel().getRenderer().setColor(Constants.COLOR_BLACK[0], Constants.COLOR_BLACK[1], Constants.COLOR_BLACK[2], 1f);
-            getMainPanel().getRenderer().roundedRectLine(Constants.GAME_WIDTH/2f - width/2f, Constants.GAME_HEIGHT - 200, width, 180, 10);
-        }
-
-        this.textArea.renderLine(this.getMainPanel(), 0, 0);
-        getMainPanel().getRenderer().end();
-
+        // Story and audio info above book
         getMainPanel().spriteBatch.begin();
-
         if (this.running != Running.CREATE_STORY) {
             if (this.choosenReadStory >= 0) {
-                getMainPanel().drawString("Story: " + this.fileTXTHandles[this.choosenReadStory].file().getName(), Constants.GAME_WIDTH / 2f, 50, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.MIDDLE, true, false);
+                getMainPanel().drawString("Story: " + this.fileTXTHandles[this.choosenReadStory].file().getName(), Constants.GAME_WIDTH / 2f, 50, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.MIDDLE, true, false);
             }
-
             if (this.choosenListenStory >= 0) {
-                getMainPanel().drawString("Audio: " + this.fileMP3Handles[this.choosenListenStory].file().getName(), Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT - 180f, Constants.COLOR_BLACK, AssetLoader.font20, DrawString.MIDDLE, false, false);
+                getMainPanel().drawString("Audio: " + this.fileMP3Handles[this.choosenListenStory].file().getName(), Constants.GAME_WIDTH / 2f, 70, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, false);
             }
         }
-        getMainPanel().drawString("Version: " + Constants.VERSION, Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT - 20f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, false);
 
-        this.textArea.renderSprite(this.getMainPanel(), 0, 0, changeY);
+        // Page content
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        int leftStart = this.currentSpread * 2 * rowsPerPage;
+        int rightStart = leftStart + rowsPerPage;
+
+        if (this.textArea.getMyText() != null && !this.textArea.getMyText().isEmpty()) {
+            if (pageAnimation.isAnimating()) {
+                // Calculate old and new spread line positions
+                int oldLeftStart = this.currentSpread * 2 * rowsPerPage;
+                int oldRightStart = oldLeftStart + rowsPerPage;
+                int newLeftStart = this.pendingSpread * 2 * rowsPerPage;
+                int newRightStart = newLeftStart + rowsPerPage;
+
+                bookRenderer.renderTurnAnimation(pageAnimation, this.textArea.getMyText(),
+                        oldLeftStart, oldRightStart,
+                        newRightStart, newLeftStart,
+                        rowsPerPage, this.fontSize);
+            } else {
+                bookRenderer.renderPageText(this.textArea.getMyText(), leftStart, rowsPerPage, this.fontSize, true);
+                bookRenderer.renderPageText(this.textArea.getMyText(), rightStart, rowsPerPage, this.fontSize, false);
+            }
+
+            // Page numbers - during animation, show numbers matching visible content per phase
+            int totalPages = (int) Math.ceil((double) this.textArea.getMyText().size() / rowsPerPage);
+            if (pageAnimation.isAnimating()) {
+                float progress = pageAnimation.getProgress();
+                boolean isForward = pageAnimation.getDirection() == PageTurnAnimation.Direction.FORWARD;
+                boolean inPhase2 = progress > 0.5f;
+
+                int leftSpread = (isForward && inPhase2) ? this.pendingSpread : this.currentSpread;
+                int rightSpread = (isForward && !inPhase2) ? this.currentSpread : this.pendingSpread;
+                if (!isForward) {
+                    leftSpread = (!inPhase2) ? this.currentSpread : this.pendingSpread;
+                    rightSpread = inPhase2 ? this.pendingSpread : this.currentSpread;
+                }
+
+                bookRenderer.renderPageNumbers(leftSpread * 2 + 1, rightSpread * 2 + 2, totalPages, this.fontSize);
+            } else {
+                int leftPageNum = this.currentSpread * 2 + 1;
+                int rightPageNum = this.currentSpread * 2 + 2;
+                bookRenderer.renderPageNumbers(leftPageNum, rightPageNum, totalPages, this.fontSize);
+            }
+        }
 
         drawGameObjectives();
 
+        getMainPanel().drawString("Version: " + Constants.VERSION, Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT - 20f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, false);
         getMainPanel().spriteBatch.end();
 
+        // Buttons
         for (ApoButton button : this.getMainPanel().getButtons()) {
             button.render(this.getMainPanel());
         }
 
+        // Loading overlay
         if (this.running != Running.NONE) {
-            width = 600;
+            int width = 600;
 
             Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
             getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
             getMainPanel().getRenderer().setColor(Constants.COLOR_WHITE[0], Constants.COLOR_WHITE[1], Constants.COLOR_WHITE[2], 0.8f);
-            getMainPanel().getRenderer().roundedRect(Constants.GAME_WIDTH/2f - width/2f, Constants.GAME_HEIGHT/2f - 50, width, 100, 10);
+            getMainPanel().getRenderer().roundedRect(Constants.GAME_WIDTH / 2f - width / 2f, Constants.GAME_HEIGHT / 2f - 50, width, 100, 10);
             getMainPanel().getRenderer().end();
             Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
 
             getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Line);
             getMainPanel().getRenderer().setColor(Constants.COLOR_BLACK[0], Constants.COLOR_BLACK[1], Constants.COLOR_BLACK[2], 1f);
-            getMainPanel().getRenderer().roundedRectLine(Constants.GAME_WIDTH/2f - width/2f, Constants.GAME_HEIGHT/2f - 50, width, 100, 10);
+            getMainPanel().getRenderer().roundedRectLine(Constants.GAME_WIDTH / 2f - width / 2f, Constants.GAME_HEIGHT / 2f - 50, width, 100, 10);
             getMainPanel().getRenderer().end();
 
             getMainPanel().spriteBatch.begin();
-            getMainPanel().drawString(Localization.getInstance().getCommon().get(this.running.getId()), Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT/2f - 20, Constants.COLOR_BLACK, AssetLoader.font40, DrawString.MIDDLE, false, false);
+            getMainPanel().drawString(Localization.getInstance().getCommon().get(this.running.getId()), Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT / 2f - 20, Constants.COLOR_BLACK, AssetLoader.font40, DrawString.MIDDLE, false, false);
             getMainPanel().spriteBatch.end();
         }
     }
 
     private void drawGameObjectives() {
-        if (this.getMainPanel().getPromptObject().getGameObjectives().getMainCharacter() != null) {
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getMainCharacter().getImage(), 10, this.textArea.getY(), 80, 80);
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getMainCharacter().getImage(), Constants.GAME_WIDTH - 90, this.textArea.getY(), 80, 80);
+        int iconY = BookRenderer.LEFT_PAGE_Y + BookRenderer.TEXT_PADDING;
+        GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
+        if (go.getMainCharacter() != null) {
+            getMainPanel().spriteBatch.draw(go.getMainCharacter().getImage(), 10, iconY, 45, 45);
+            getMainPanel().spriteBatch.draw(go.getMainCharacter().getImage(), Constants.GAME_WIDTH - 55, iconY, 45, 45);
         }
-        if (this.getMainPanel().getPromptObject().getGameObjectives().getSupportingCharacter() != null) {
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getSupportingCharacter().getImage(), 10, this.textArea.getY() + 80, 80, 80);
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getSupportingCharacter().getImage(), Constants.GAME_WIDTH - 90, this.textArea.getY() + 80, 80, 80);
+        if (go.getSupportingCharacter() != null) {
+            getMainPanel().spriteBatch.draw(go.getSupportingCharacter().getImage(), 10, iconY + 50, 45, 45);
+            getMainPanel().spriteBatch.draw(go.getSupportingCharacter().getImage(), Constants.GAME_WIDTH - 55, iconY + 50, 45, 45);
         }
-        if (this.getMainPanel().getPromptObject().getGameObjectives().getUniverse() != null) {
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getUniverse().getImage(), 10, this.textArea.getY() + 2 * 80, 80, 80);
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getUniverse().getImage(), Constants.GAME_WIDTH - 90, this.textArea.getY() + 2 * 80, 80, 80);
+        if (go.getUniverse() != null) {
+            getMainPanel().spriteBatch.draw(go.getUniverse().getImage(), 10, iconY + 100, 45, 45);
+            getMainPanel().spriteBatch.draw(go.getUniverse().getImage(), Constants.GAME_WIDTH - 55, iconY + 100, 45, 45);
         }
-        if (this.getMainPanel().getPromptObject().getGameObjectives().getPlaces() != null) {
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getPlaces().getImage(), 10, this.textArea.getY() + 3 * 80, 80, 80);
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getPlaces().getImage(), Constants.GAME_WIDTH - 90, this.textArea.getY() + 3 * 80, 80, 80);
+        if (go.getPlaces() != null) {
+            getMainPanel().spriteBatch.draw(go.getPlaces().getImage(), 10, iconY + 150, 45, 45);
+            getMainPanel().spriteBatch.draw(go.getPlaces().getImage(), Constants.GAME_WIDTH - 55, iconY + 150, 45, 45);
         }
-        if (this.getMainPanel().getPromptObject().getGameObjectives().getObjectives() != null) {
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getObjectives().getImage(), 10, this.textArea.getY() + 4 * 80, 80, 80);
-            getMainPanel().spriteBatch.draw(this.getMainPanel().getPromptObject().getGameObjectives().getObjectives().getImage(), Constants.GAME_WIDTH - 90, this.textArea.getY() + 4 * 80, 80, 80);
+        if (go.getObjectives() != null) {
+            getMainPanel().spriteBatch.draw(go.getObjectives().getImage(), 10, iconY + 200, 45, 45);
+            getMainPanel().spriteBatch.draw(go.getObjectives().getImage(), Constants.GAME_WIDTH - 55, iconY + 200, 45, 45);
         }
     }
 

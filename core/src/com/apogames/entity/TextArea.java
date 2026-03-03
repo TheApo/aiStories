@@ -34,54 +34,42 @@ public class TextArea extends ApoButton {
     public void setText(String text) {
         this.myText.clear();
 
-//        text = text.replace("\n\n", "\n");
-
         super.setText(text);
 
-        boolean end = false;
-        String currentString = "";
-        String leftString = text;
-        int startIndex = 0;
-        int firstIndex = 0;
-        int lastNextSpace = 0;
-        while (!end) {
-            int nextSpace = text.indexOf(" ", startIndex);
-            int nextLineBreak = text.indexOf("\n", startIndex);
-            if (nextSpace == -1) {
-                this.myText.add(leftString.substring(firstIndex));
-                end = true;
-            } else {
-                boolean skip = false;
-                if (nextLineBreak > 0) {
-                    currentString = leftString.substring(firstIndex, nextLineBreak);
-                    Constants.glyphLayout.setText(getFont(), currentString);
+        if (getFont() == null) {
+            return;
+        }
 
-                    if (Constants.glyphLayout.width < this.getWidth() - 20) {
-                        myText.add(leftString.substring(firstIndex, nextLineBreak));
-                        firstIndex = nextLineBreak + 1;
-                        startIndex = firstIndex;
-                        skip = true;
-                    }
-                }
-
-                if (!skip) {
-                    currentString = leftString.substring(firstIndex, nextSpace);
-                    if (getFont() == null) {
-                        return;
-                    }
-                    if (currentString == null) {
-                        currentString = "";
-                    }
-                    Constants.glyphLayout.setText(getFont(), currentString);
-
-                    if (Constants.glyphLayout.width > this.getWidth() - 20) {
-                        myText.add(leftString.substring(firstIndex, lastNextSpace));
-                        firstIndex = lastNextSpace + 1;
+        float maxWidth = this.getWidth() - 20;
+        String[] paragraphs = text.split("\n", -1);
+        for (String paragraph : paragraphs) {
+            if (paragraph.trim().isEmpty()) {
+                myText.add("");
+                continue;
+            }
+            Constants.glyphLayout.setText(getFont(), paragraph);
+            if (Constants.glyphLayout.width <= maxWidth) {
+                myText.add(paragraph);
+                continue;
+            }
+            String[] words = paragraph.split(" ", -1);
+            StringBuilder current = new StringBuilder();
+            for (String word : words) {
+                if (current.length() == 0) {
+                    current.append(word);
+                } else {
+                    String test = current + " " + word;
+                    Constants.glyphLayout.setText(getFont(), test);
+                    if (Constants.glyphLayout.width > maxWidth) {
+                        myText.add(current.toString());
+                        current = new StringBuilder(word);
                     } else {
-                        lastNextSpace = nextSpace;
-                        startIndex = nextSpace + 1;
+                        current = new StringBuilder(test);
                     }
                 }
+            }
+            if (current.length() > 0) {
+                myText.add(current.toString());
             }
         }
     }
