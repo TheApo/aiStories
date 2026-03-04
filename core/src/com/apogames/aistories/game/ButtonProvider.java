@@ -250,13 +250,13 @@ public class ButtonProvider {
             ((ApoButtonImageThreeExtra)(button)).setExtra(ApoButtonImageThreeExtra.EXTRA.PREV);
             this.game.getButtons().add(button);
 
-            // Tonie upload button - smaller, below book
+            // Tonie upload button - below book
             text = "";
             function = ListenStories.FUNCTION_UPLOAD_TONIE;
-            width = 100;
-            height = 120;
-            x = 70;
-            y = 585;
+            width = 130;
+            height = 156;
+            x = 65;
+            y = 578;
             button = new ApoButtonImage(x, y, width, height, function, "", AssetLoader.tonieTextureRegion);
             button.setFont(AssetLoader.font20);
             this.game.getButtons().add(button);

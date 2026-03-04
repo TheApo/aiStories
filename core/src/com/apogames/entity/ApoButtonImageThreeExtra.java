@@ -39,6 +39,18 @@ public class ApoButtonImageThreeExtra extends ApoButtonImageThree {
         this.setExtra(EXTRA.PLAY);
     }
 
+    @Override
+    public void setX(float x) {
+        super.setX(x);
+        setExtra(this.extra);
+    }
+
+    @Override
+    public void setY(float y) {
+        super.setY(y);
+        setExtra(this.extra);
+    }
+
     public void setExtra(EXTRA extra) {
         this.extra = extra;
 

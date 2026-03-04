@@ -5,7 +5,16 @@
       "Bash(tail:*)",
       "WebSearch",
       "Bash(grep:*)",
-      "Bash(./gradlew :core:compileJava:*)"
+      "Bash(./gradlew :core:compileJava:*)",
+      "WebFetch(domain:libgdx.badlogicgames.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:libgdx.com)",
+      "WebFetch(domain:elevenlabs.io)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:www.postman.com)",
+      "WebFetch(domain:help.elevenlabs.io)",
+      "WebFetch(domain:wavespeed.ai)"
     ]
   }
 }

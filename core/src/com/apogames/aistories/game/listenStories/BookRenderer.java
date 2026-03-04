@@ -19,7 +19,8 @@ public class BookRenderer {
     public static final int BOOK_X = 60;
     public static final int BOOK_Y = 90;
     public static final int BOOK_WIDTH = 1280;
-    public static final int BOOK_HEIGHT = 480;
+    public static final int DEFAULT_BOOK_HEIGHT = 480;
+    public static final int EXTENDED_BOOK_HEIGHT = 560;
     public static final int SPINE_WIDTH = 2;
     public static final int PAGE_MARGIN = 10;
     public static final int TEXT_PADDING = 15;
@@ -29,12 +30,22 @@ public class BookRenderer {
     public static final int LEFT_PAGE_X = BOOK_X + PAGE_MARGIN;
     public static final int LEFT_PAGE_Y = BOOK_Y + PAGE_MARGIN;
     public static final int PAGE_WIDTH = (BOOK_WIDTH / 2) - PAGE_MARGIN - (SPINE_WIDTH / 2);
-    public static final int PAGE_HEIGHT = BOOK_HEIGHT - 2 * PAGE_MARGIN;
 
     public static final int RIGHT_PAGE_X = SPINE_X + SPINE_WIDTH / 2;
     public static final int RIGHT_PAGE_Y = BOOK_Y + PAGE_MARGIN;
 
     public static final int TEXT_WIDTH = PAGE_WIDTH - 2 * TEXT_PADDING;
+
+    private static int BOOK_HEIGHT = DEFAULT_BOOK_HEIGHT;
+    private static int PAGE_HEIGHT = BOOK_HEIGHT - 2 * PAGE_MARGIN;
+
+    public static int getBookHeight() { return BOOK_HEIGHT; }
+    public static int getPageHeight() { return PAGE_HEIGHT; }
+
+    public static void setBookHeight(int height) {
+        BOOK_HEIGHT = height;
+        PAGE_HEIGHT = BOOK_HEIGHT - 2 * PAGE_MARGIN;
+    }
 
     private final MainPanel mainPanel;
     private final Set<Integer> chapterLines = new HashSet<>();

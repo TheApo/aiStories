@@ -19,6 +19,8 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import lombok.Getter;
 
+import com.mpatric.mp3agic.Mp3File;
+
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,6 +60,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private Music music;
 
     private int choosenListenStory = -1;
+    private float totalDuration = 0f;
+    private int lastRenderedSecond = -1;
     private ArrayList<Integer> choosenImageStory = new ArrayList<>();
     private int choosenReadStory = -1;
 
@@ -76,7 +80,15 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private final BookRenderer bookRenderer;
     private final PageTurnAnimation pageAnimation = new PageTurnAnimation();
 
+    private static final int ROW1_Y_NORMAL = 580;
+    private static final int ROW2_Y = 665;
+    private static final int ROW1_Y_EXTENDED = 660;
+    private static final int ROW_HEIGHT = 70;
+    private static final int ROW_BG_WIDTH = 560;
+    private static final int ROW_BG_X = Constants.GAME_WIDTH / 2 - ROW_BG_WIDTH / 2;
+
     private Running running = Running.NONE;
+    private boolean audioCapable = false;
 
     private String nextText = null;
     private Running nextRunning;
@@ -89,9 +101,6 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     public void setNeededButtonsVisible() {
         getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(true);
-        getMainPanel().getButtonByFunction(FUNCTION_PLAY).setVisible(true);
-        getMainPanel().getButtonByFunction(FUNCTION_STOP).setVisible(true);
-        getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(false);
         getMainPanel().getButtonByFunction(FUNCTION_FONT_BIGGER).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_FONT_SMALLER).setVisible(true);
@@ -153,22 +162,30 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.fileImageHandles = Gdx.files.local(Prompt.DIRECTORY).list(".png");
         Arrays.sort(this.fileImageHandles, (file1, file2) -> file1.name().compareToIgnoreCase(file2.name()));
 
-        if (this.textArea == null) {
-            this.textArea = new TextArea(0, 0, bookRenderer.getTextAreaWidth(), BookRenderer.PAGE_HEIGHT, "TextArea", "");
-        }
-        this.textArea.setFont(fontSize.getFont());
-        this.setUpFont(0);
-
+        // Determine story and audio state first (affects book height)
         this.choosenReadStory = -1;
         if (this.fileTXTHandles.length > 0) {
             this.choosenReadStory = this.fileTXTHandles.length - 1;
             if (chooseStory >= 0) {
                 this.choosenReadStory = chooseStory;
             }
+        }
+        findListenStory();
+
+        // Create/update TextArea with correct height
+        if (this.textArea == null) {
+            this.textArea = new TextArea(0, 0, bookRenderer.getTextAreaWidth(), BookRenderer.getPageHeight(), "TextArea", "");
+        } else {
+            this.textArea.setHeight(BookRenderer.getPageHeight());
+        }
+        this.textArea.setFont(fontSize.getFont());
+        this.setUpFont(0);
+
+        // Now set text with correct layout
+        if (this.choosenReadStory >= 0) {
             String text = this.fileTXTHandles[this.choosenReadStory].readString();
             this.setTextInTextArea(text);
         }
-        findListenStory();
     }
 
     private void setTextInTextArea(String text) {
@@ -314,6 +331,76 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         boolean canGoForward = (this.currentSpread + 1) * 2 * rowsPerPage < this.textArea.getMyText().size();
         getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_PAGE).setVisible(canGoBack);
         getMainPanel().getButtonByFunction(FUNCTION_NEXT_PAGE).setVisible(canGoForward);
+    }
+
+    private boolean hasAudioCapability() {
+        boolean hasMp3 = this.choosenListenStory >= 0;
+        boolean hasElevenLabs = ElvenlabIO.API_KEY != null && !ElvenlabIO.API_KEY.isEmpty()
+                && !ElvenlabIO.API_KEY.equals("Dein ELEVENLABS_API_KEY");
+        return hasMp3 || hasElevenLabs;
+    }
+
+    private void updateAudioButtonVisibility() {
+        boolean hasMp3 = this.choosenListenStory >= 0;
+        if (!hasMp3) {
+            getMainPanel().getButtonByFunction(FUNCTION_PLAY).setVisible(false);
+            getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setVisible(false);
+            getMainPanel().getButtonByFunction(FUNCTION_STOP).setVisible(false);
+            return;
+        }
+        boolean isPlaying = this.music != null && this.music.isPlaying();
+        getMainPanel().getButtonByFunction(FUNCTION_PLAY).setVisible(!isPlaying);
+        getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setVisible(isPlaying);
+        getMainPanel().getButtonByFunction(FUNCTION_STOP).setVisible(isPlaying);
+    }
+
+    private void updateLayout() {
+        this.audioCapable = hasAudioCapability();
+        int bookHeight = audioCapable ? BookRenderer.DEFAULT_BOOK_HEIGHT : BookRenderer.EXTENDED_BOOK_HEIGHT;
+        BookRenderer.setBookHeight(bookHeight);
+
+        int row1Y = audioCapable ? ROW1_Y_NORMAL : ROW1_Y_EXTENDED;
+        int buttonCenterY = row1Y + (ROW_HEIGHT - 64) / 2;
+
+        // Reposition row 1 buttons (page nav, font size, delete)
+        getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_PAGE).setY(buttonCenterY);
+        getMainPanel().getButtonByFunction(FUNCTION_NEXT_PAGE).setY(buttonCenterY);
+        getMainPanel().getButtonByFunction(FUNCTION_FONT_SMALLER).setY(buttonCenterY);
+        getMainPanel().getButtonByFunction(FUNCTION_FONT_BIGGER).setY(buttonCenterY);
+        getMainPanel().getButtonByFunction(FUNCTION_DELETE).setY(buttonCenterY);
+
+        // Tonie button: left side, below book, top aligned with row1
+        getMainPanel().getButtonByFunction(FUNCTION_UPLOAD_TONIE).setY(row1Y);
+
+        // Reposition row 2 buttons (audio) - centered
+        int audioY = ROW2_Y + (ROW_HEIGHT - 64) / 2;
+        getMainPanel().getButtonByFunction(FUNCTION_PLAY).setX(Constants.GAME_WIDTH / 2f - 32);
+        getMainPanel().getButtonByFunction(FUNCTION_PLAY).setY(audioY);
+        getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setX(Constants.GAME_WIDTH / 2f - 64 - 10);
+        getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setY(audioY);
+        getMainPanel().getButtonByFunction(FUNCTION_STOP).setX(Constants.GAME_WIDTH / 2f + 10);
+        getMainPanel().getButtonByFunction(FUNCTION_STOP).setY(audioY);
+        getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setY(audioY);
+
+        // Hide audio row entirely if no audio capability
+        if (!audioCapable) {
+            getMainPanel().getButtonByFunction(FUNCTION_PLAY).setVisible(false);
+            getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setVisible(false);
+            getMainPanel().getButtonByFunction(FUNCTION_STOP).setVisible(false);
+            getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(false);
+        }
+
+        // Update TextArea for new page height if needed
+        if (this.textArea != null) {
+            this.textArea.setHeight(BookRenderer.getPageHeight());
+        }
+    }
+
+    private String formatTime(float seconds) {
+        int totalSeconds = (int) seconds;
+        int minutes = totalSeconds / 60;
+        int secs = totalSeconds % 60;
+        return String.format("%d:%02d", minutes, secs);
     }
 
     private EnumInterface resolveEntity(String name, EnumInterface current, CustomEntity custom) {
@@ -521,10 +608,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.choosenReadStory = 0;
         }
 
-        this.setTextInTextArea(this.fileTXTHandles[this.choosenReadStory].readString());
-
         findImageStory();
         findListenStory();
+        this.setTextInTextArea(this.fileTXTHandles[this.choosenReadStory].readString());
     }
 
     private void findImageStory() {
@@ -557,25 +643,30 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         searchName = searchName.substring(0, searchName.length() - 4);
         this.choosenListenStory = -1;
         this.music = null;
+        this.totalDuration = 0f;
         int index = 0;
         for (FileHandle fileHandle : this.fileMP3Handles) {
             String fileName = fileHandle.file().getName();
             if (fileName.substring(0, fileName.length() - 4).equals(searchName)) {
                 this.choosenListenStory = index;
                 this.music = Gdx.audio.newMusic(this.fileMP3Handles[this.choosenListenStory]);
+                try {
+                    Mp3File mp3 = new Mp3File(fileHandle.file());
+                    this.totalDuration = mp3.getLengthInSeconds();
+                } catch (Exception e) {
+                    Gdx.app.log("ListenStories", "Could not read MP3 duration: " + e.getMessage());
+                }
                 break;
             }
             index += 1;
         }
 
-        boolean visible = choosenListenStory != -1;
+        boolean hasMp3 = choosenListenStory != -1;
+        getMainPanel().getButtonByFunction(FUNCTION_UPLOAD_TONIE).setVisible(hasMp3);
+        getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(!hasMp3);
 
-        getMainPanel().getButtonByFunction(FUNCTION_PLAY).setVisible(visible);
-        getMainPanel().getButtonByFunction(FUNCTION_STOP).setVisible(visible);
-        getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setVisible(visible);
-        getMainPanel().getButtonByFunction(FUNCTION_UPLOAD_TONIE).setVisible(visible);
-        getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(!visible);
-
+        updateLayout();
+        updateAudioButtonVisibility();
         this.setVisibleFalseWhenNotSet();
     }
 
@@ -613,19 +704,26 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private void playMusic() {
         if (this.music != null) {
             this.music.play();
+            Gdx.graphics.setContinuousRendering(true);
         }
+        updateAudioButtonVisibility();
     }
 
     private void pauseMusic() {
         if (this.music != null) {
             this.music.pause();
         }
+        Gdx.graphics.setContinuousRendering(false);
+        updateAudioButtonVisibility();
     }
 
     private void stopMusic() {
         if (this.music != null) {
             this.music.stop();
         }
+        this.lastRenderedSecond = -1;
+        Gdx.graphics.setContinuousRendering(false);
+        updateAudioButtonVisibility();
     }
 
     private void setButtonsVisibility() {
@@ -643,11 +741,22 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     @Override
     public void doThink(float delta) {
+        if (this.music != null && this.music.isPlaying()) {
+            int currentSecond = (int) this.music.getPosition();
+            if (currentSecond != this.lastRenderedSecond) {
+                this.lastRenderedSecond = currentSecond;
+                Gdx.graphics.requestRendering();
+            }
+        }
+
         if (pageAnimation.isAnimating()) {
             boolean finished = pageAnimation.update(delta);
             if (finished) {
                 this.currentSpread = this.pendingSpread;
-                Gdx.graphics.setContinuousRendering(false);
+                boolean musicPlaying = this.music != null && this.music.isPlaying();
+                if (!musicPlaying) {
+                    Gdx.graphics.setContinuousRendering(false);
+                }
                 updatePageButtonVisibility();
             }
             Gdx.graphics.requestRendering();
@@ -753,6 +862,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().drawString("Version: " + Constants.VERSION, Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT - 20f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, false);
         getMainPanel().spriteBatch.end();
 
+        // Semi-transparent backgrounds behind button rows
+        renderButtonBackgrounds();
+
         // Buttons
         for (ApoButton button : this.getMainPanel().getButtons()) {
             button.render(this.getMainPanel());
@@ -776,6 +888,41 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
             getMainPanel().spriteBatch.begin();
             getMainPanel().drawString(Localization.getInstance().getCommon().get(this.running.getId()), Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT / 2f - 20, Constants.COLOR_BLACK, AssetLoader.font40, DrawString.MIDDLE, false, false);
+            getMainPanel().spriteBatch.end();
+        }
+    }
+
+    private void renderButtonBackgrounds() {
+        if (this.running != Running.NONE) return;
+
+        int row1Y = audioCapable ? ROW1_Y_NORMAL : ROW1_Y_EXTENDED;
+
+        Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
+        getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
+
+        // Row 1: Page navigation background (centered, compact)
+        getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.3f);
+        getMainPanel().getRenderer().roundedRect(ROW_BG_X, row1Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
+
+        // Row 2: Audio background (only if audio capable)
+        if (audioCapable) {
+            getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.3f);
+            getMainPanel().getRenderer().roundedRect(ROW_BG_X, ROW2_Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
+        }
+
+        getMainPanel().getRenderer().end();
+        Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
+
+        // "Musik" label and duration on audio row
+        if (audioCapable) {
+            getMainPanel().spriteBatch.begin();
+            String musicLabel = Localization.getInstance().getCommon().get("listen_music");
+            getMainPanel().drawString(musicLabel, ROW_BG_X + 15, ROW2_Y + ROW_HEIGHT / 2f - 10, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.BEGIN, true, false);
+
+            if (this.music != null && this.totalDuration > 0) {
+                String timeDisplay = formatTime(this.music.getPosition()) + " / " + formatTime(this.totalDuration);
+                getMainPanel().drawString(timeDisplay, ROW_BG_X + ROW_BG_WIDTH - 15, ROW2_Y + ROW_HEIGHT / 2f - 10, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.END, false, false);
+            }
             getMainPanel().spriteBatch.end();
         }
     }
