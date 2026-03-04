@@ -132,14 +132,9 @@ public class Menu extends SequentiallyThinkingScreenModel {
     @Override
     public void render() {
         getMainPanel().spriteBatch.begin();
-
         getMainPanel().spriteBatch.draw(AssetLoader.backgroundTextureRegion, 0, 0);
-
-
-        getMainPanel().drawString(Localization.getInstance().getCommon().get("title"), Constants.GAME_WIDTH / 2f, 30, Constants.COLOR_WHITE, AssetLoader.font40, DrawString.MIDDLE, true, false);
-
         getMainPanel().drawString("Version: " + Constants.VERSION, Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT - 20f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, false);
-
+        getMainPanel().drawTitle(Localization.getInstance().getCommon().get("title"), Constants.COLOR_WHITE, true);
         getMainPanel().spriteBatch.end();
 
         for (ApoButton button : this.getMainPanel().getButtons()) {

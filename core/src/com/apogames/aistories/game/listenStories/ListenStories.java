@@ -23,8 +23,6 @@ import com.mpatric.mp3agic.Mp3File;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -62,6 +60,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private int choosenListenStory = -1;
     private float totalDuration = 0f;
     private int lastRenderedSecond = -1;
+    private WordTimingData timingData = null;
+    private WordHighlighter highlighter = null;
     private ArrayList<Integer> choosenImageStory = new ArrayList<>();
     private int choosenReadStory = -1;
 
@@ -248,11 +248,28 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             // Pad to page boundary
             int posInPage = i % rowsPerPage;
             if (posInPage != 0) {
-                int padding = rowsPerPage - posInPage;
-                for (int j = 0; j < padding; j++) {
-                    lines.add(i, "");
+                // Check if all lines from page start to here are empty
+                int pageStart = i - posInPage;
+                boolean allEmpty = true;
+                for (int j = pageStart; j < i; j++) {
+                    if (!lines.get(j).trim().isEmpty()) {
+                        allEmpty = false;
+                        break;
+                    }
                 }
-                i += padding;
+                if (allEmpty) {
+                    // Remove empty lines to avoid a blank page
+                    for (int j = 0; j < posInPage; j++) {
+                        lines.remove(pageStart);
+                    }
+                    i -= posInPage;
+                } else {
+                    int padding = rowsPerPage - posInPage;
+                    for (int j = 0; j < padding; j++) {
+                        lines.add(i, "");
+                    }
+                    i += padding;
+                }
             }
 
             // Collect full heading text (TextArea may have wrapped across lines)
@@ -351,7 +368,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         boolean isPlaying = this.music != null && this.music.isPlaying();
         getMainPanel().getButtonByFunction(FUNCTION_PLAY).setVisible(!isPlaying);
         getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setVisible(isPlaying);
-        getMainPanel().getButtonByFunction(FUNCTION_STOP).setVisible(isPlaying);
+        getMainPanel().getButtonByFunction(FUNCTION_STOP).setVisible(true);
     }
 
     private void updateLayout() {
@@ -374,9 +391,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         // Reposition row 2 buttons (audio) - centered
         int audioY = ROW2_Y + (ROW_HEIGHT - 64) / 2;
-        getMainPanel().getButtonByFunction(FUNCTION_PLAY).setX(Constants.GAME_WIDTH / 2f - 32);
+        float playPauseX = Constants.GAME_WIDTH / 2f - 64 - 10;
+        getMainPanel().getButtonByFunction(FUNCTION_PLAY).setX(playPauseX);
         getMainPanel().getButtonByFunction(FUNCTION_PLAY).setY(audioY);
-        getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setX(Constants.GAME_WIDTH / 2f - 64 - 10);
+        getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setX(playPauseX);
         getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setY(audioY);
         getMainPanel().getButtonByFunction(FUNCTION_STOP).setX(Constants.GAME_WIDTH / 2f + 10);
         getMainPanel().getButtonByFunction(FUNCTION_STOP).setY(audioY);
@@ -412,8 +430,30 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     public void createNewStory() {
         this.running = Running.CREATE_STORY;
-
+        this.currentSpread = 0;
+        this.pendingSpread = 0;
+        fitPromptToTwoPages();
         this.setButtonsInsivislbe();
+    }
+
+    private void fitPromptToTwoPages() {
+        if (this.textArea == null) return;
+        String text = this.textArea.getText();
+        if (text == null || text.isEmpty()) return;
+
+        bookRenderer.getChapterLines().clear();
+
+        FontSize[] candidates = {FontSize.FONT_25, FontSize.FONT_20, FontSize.FONT_15};
+        for (FontSize candidate : candidates) {
+            this.fontSize = candidate;
+            this.textArea.setAdd(candidate.getAdd());
+            this.textArea.setFont(candidate.getFont());
+            this.textArea.setText(text);
+            int rowsPerPage = bookRenderer.getRowsPerPage(candidate);
+            if (this.textArea.getMyText().size() <= 2 * rowsPerPage) {
+                return;
+            }
+        }
     }
 
     public void setButtonsInsivislbe() {
@@ -549,22 +589,26 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private void deleteCurrentFileAndText() {
         if (this.choosenListenStory >= 0) {
             if (this.music != null) {
-                if (this.music.isPlaying()) {
-                    this.music.stop();
-                }
+                Gdx.app.log("DELETE", "Stopping and disposing Music object");
+                this.music.stop();
                 this.music.dispose();
                 this.music = null;
-                System.gc();
             }
+            this.highlighter = null;
+            this.timingData = null;
+
             FileHandle mp3FileHandle = this.fileMP3Handles[this.choosenListenStory];
             File mp3File = mp3FileHandle.file();
+            Gdx.app.log("DELETE", "MP3 path: " + mp3File.getAbsolutePath());
+            Gdx.app.log("DELETE", "MP3 exists: " + mp3File.exists() + ", canWrite: " + mp3File.canWrite() + ", length: " + mp3File.length());
 
-            Path path = Paths.get(mp3File.getAbsolutePath());
-            try {
-                Files.delete(path);
-                System.out.println("File successfully deleted via NIO");
-            } catch (Exception e) {
-                System.out.println("Deletion failed via NIO: " + e.getMessage());
+            deleteFileWithNio(mp3File);
+
+            // Delete associated JSON timing file
+            String mp3Path = mp3FileHandle.path();
+            File jsonFile = Gdx.files.local(mp3Path.replace(".mp3", ".json")).file();
+            if (jsonFile.exists()) {
+                deleteFileWithNio(jsonFile);
             }
         }
         this.fileTXTHandles[this.choosenReadStory].delete();
@@ -572,6 +616,21 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         reloadFileHandler();
         this.choosenReadStory = readStory;
         this.nextStory(0);
+    }
+
+    private void deleteFileWithNio(File file) {
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                Files.deleteIfExists(file.toPath());
+                Gdx.app.log("DELETE", "Deleted: " + file.getName() + " (attempt " + attempt + ")");
+                return;
+            } catch (Exception e) {
+                Gdx.app.log("DELETE", "Attempt " + attempt + " failed for " + file.getName() + ": " + e.getMessage());
+                System.gc();
+                try { Thread.sleep(100); } catch (InterruptedException ignored) {}
+            }
+        }
+        Gdx.app.log("DELETE", "FAILED to delete after 3 attempts: " + file.getAbsolutePath());
     }
 
     public void uploadToTonieBox(FileHandle fileHandle) {
@@ -592,7 +651,17 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         searchName = searchName.substring(0, searchName.length() - 4);
 
         ElvenlabIO elevenlabIO = new ElvenlabIO(this);
-        elevenlabIO.sendTextToSpeech(this.textArea.getText(), Prompt.DIRECTORY+searchName+".mp3");
+        elevenlabIO.sendTextToSpeech(buildTtsText(), Prompt.DIRECTORY+searchName+".mp3");
+    }
+
+    private String buildTtsText() {
+        StringBuilder sb = new StringBuilder();
+        for (String line : this.textArea.getMyText()) {
+            if (line.trim().isEmpty()) continue;
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(line);
+        }
+        return sb.toString();
     }
 
     private void nextStory(int add) {
@@ -642,20 +711,37 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         String searchName = this.fileTXTHandles[this.choosenReadStory].file().getName();
         searchName = searchName.substring(0, searchName.length() - 4);
         this.choosenListenStory = -1;
-        this.music = null;
+        if (this.music != null) {
+            this.music.stop();
+            this.music.dispose();
+            this.music = null;
+        }
         this.totalDuration = 0f;
+        this.timingData = null;
+        this.highlighter = null;
         int index = 0;
         for (FileHandle fileHandle : this.fileMP3Handles) {
             String fileName = fileHandle.file().getName();
             if (fileName.substring(0, fileName.length() - 4).equals(searchName)) {
                 this.choosenListenStory = index;
                 this.music = Gdx.audio.newMusic(this.fileMP3Handles[this.choosenListenStory]);
+                this.music.setOnCompletionListener(m -> {
+                    this.lastRenderedSecond = -1;
+                    this.highlighter = null;
+                    Gdx.graphics.setContinuousRendering(false);
+                    updateAudioButtonVisibility();
+                    Gdx.graphics.requestRendering();
+                });
                 try {
                     Mp3File mp3 = new Mp3File(fileHandle.file());
                     this.totalDuration = mp3.getLengthInSeconds();
                 } catch (Exception e) {
                     Gdx.app.log("ListenStories", "Could not read MP3 duration: " + e.getMessage());
                 }
+                // Load word timing data if JSON exists
+                String jsonPath = Prompt.DIRECTORY + searchName + ".json";
+                this.timingData = WordTimingData.loadFromFile(jsonPath);
+                Gdx.app.log("ListenStories", "Word timing JSON " + (this.timingData != null ? "loaded (" + this.timingData.getWords().size() + " words)" : "not found") + " for " + searchName);
                 break;
             }
             index += 1;
@@ -696,6 +782,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.textArea.setFont(this.fontSize.getFont());
         this.textArea.setText(this.textArea.getText());
         processAndLayoutChapters();
+        rebuildHighlighterMapping();
         updatePageButtonVisibility();
 
         Gdx.graphics.requestRendering();
@@ -705,8 +792,23 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         if (this.music != null) {
             this.music.play();
             Gdx.graphics.setContinuousRendering(true);
+            if (this.timingData != null && this.highlighter == null) {
+                this.highlighter = new WordHighlighter(this.timingData);
+                rebuildHighlighterMapping();
+                Gdx.app.log("ListenStories", "WordHighlighter created and mapping built");
+            }
         }
         updateAudioButtonVisibility();
+    }
+
+    private void rebuildHighlighterMapping() {
+        if (this.highlighter != null && this.textArea != null && this.textArea.getMyText() != null) {
+            this.highlighter.buildMapping(
+                    this.textArea.getMyText(),
+                    this.fontSize.getFont(),
+                    this.fontSize.getNext(1).getFont(),
+                    this.bookRenderer.getChapterLines());
+        }
     }
 
     private void pauseMusic() {
@@ -722,6 +824,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.music.stop();
         }
         this.lastRenderedSecond = -1;
+        this.highlighter = null;
         Gdx.graphics.setContinuousRendering(false);
         updateAudioButtonVisibility();
     }
@@ -747,6 +850,19 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 this.lastRenderedSecond = currentSecond;
                 Gdx.graphics.requestRendering();
             }
+            // Update word highlighter and auto-page-turn
+            if (this.highlighter != null && !pageAnimation.isAnimating()) {
+                this.highlighter.update(this.music.getPosition());
+                int currentLine = this.highlighter.getCurrentLine();
+                if (currentLine >= 0) {
+                    int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+                    int visibleStart = this.currentSpread * 2 * rowsPerPage;
+                    int visibleEnd = visibleStart + 2 * rowsPerPage;
+                    if (currentLine >= visibleEnd) {
+                        nextPage(+1);
+                    }
+                }
+            }
         }
 
         if (pageAnimation.isAnimating()) {
@@ -764,6 +880,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         if (this.nextText != null) {
             String text = this.nextText;
+            this.fontSize = FontSize.FONT_25;
             this.setTextInTextArea(text);
 
             this.saveText(text);
@@ -777,6 +894,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             if (this.nextRunning == Running.NONE && this.running == Running.CREATE_STORY) {
                 getMainPanel().getButtonByFunction(FUNCTION_NEXT_STORY).setVisible(true);
                 getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_STORY).setVisible(true);
+                getMainPanel().getButtonByFunction(FUNCTION_DELETE).setVisible(true);
                 this.reloadFileHandler();
             }
 
@@ -801,6 +919,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         // Book frame (cover, pages, spine)
         bookRenderer.renderBookFrame();
+
+        // Word highlight (between page background and text)
+        renderWordHighlight();
 
         // Story and audio info above book
         getMainPanel().spriteBatch.begin();
@@ -892,6 +1013,20 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         }
     }
 
+    private void renderWordHighlight() {
+        if (this.highlighter == null || this.highlighter.getCurrentWordIndex() < 0) return;
+        if (this.textArea == null || this.textArea.getMyText() == null) return;
+
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        int leftStart = this.currentSpread * 2 * rowsPerPage;
+
+        Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
+        getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
+        this.highlighter.renderHighlight(getMainPanel().getRenderer(), this.fontSize, leftStart, rowsPerPage);
+        getMainPanel().getRenderer().end();
+        Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
+    }
+
     private void renderButtonBackgrounds() {
         if (this.running != Running.NONE) return;
 
@@ -901,27 +1036,28 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
 
         // Row 1: Page navigation background (centered, compact)
-        getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.3f);
+        getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.5f);
         getMainPanel().getRenderer().roundedRect(ROW_BG_X, row1Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
 
         // Row 2: Audio background (only if audio capable)
         if (audioCapable) {
-            getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.3f);
+            getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.5f);
             getMainPanel().getRenderer().roundedRect(ROW_BG_X, ROW2_Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
         }
 
         getMainPanel().getRenderer().end();
         Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
 
-        // "Musik" label and duration on audio row
-        if (audioCapable) {
+        // Label and duration on audio row (only when MP3 exists)
+        if (this.choosenListenStory >= 0) {
+            float textY = ROW2_Y + ROW_HEIGHT / 2f - 12;
             getMainPanel().spriteBatch.begin();
-            String musicLabel = Localization.getInstance().getCommon().get("listen_music");
-            getMainPanel().drawString(musicLabel, ROW_BG_X + 15, ROW2_Y + ROW_HEIGHT / 2f - 10, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.BEGIN, true, false);
+            String label = Localization.getInstance().getCommon().get("listen_music");
+            getMainPanel().drawString(label, ROW_BG_X + 15, textY, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);
 
             if (this.music != null && this.totalDuration > 0) {
                 String timeDisplay = formatTime(this.music.getPosition()) + " / " + formatTime(this.totalDuration);
-                getMainPanel().drawString(timeDisplay, ROW_BG_X + ROW_BG_WIDTH - 15, ROW2_Y + ROW_HEIGHT / 2f - 10, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.END, false, false);
+                getMainPanel().drawString(timeDisplay, ROW_BG_X + ROW_BG_WIDTH - 15, textY, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.END, false, false);
             }
             getMainPanel().spriteBatch.end();
         }

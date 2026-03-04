@@ -245,9 +245,7 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         }
         getMainPanel().getRenderer().end();
 
-        getMainPanel().spriteBatch.begin();
-
-        getMainPanel().drawString(Localization.getInstance().getCommon().get("title"), Constants.GAME_WIDTH / 2f, 30, Constants.COLOR_WHITE, AssetLoader.font40, DrawString.MIDDLE, true, false);
+        getMainPanel().drawTitle(Localization.getInstance().getCommon().get("title"), Constants.COLOR_WHITE, false);
 
         for (ObjectSelection selection : this.objectSelection) {
             selection.renderSprite(getMainPanel(), 0, 0);

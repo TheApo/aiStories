@@ -296,10 +296,7 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         this.nameField.render(getMainPanel(), 0, 0);
         this.detailsField.render(getMainPanel(), 0, 0);
 
-        getMainPanel().spriteBatch.begin();
-
-        // Dynamic title based on category
-        getMainPanel().drawString(getEditorTitle(), Constants.GAME_WIDTH / 2f, 30, Constants.COLOR_WHITE, AssetLoader.font40, DrawString.MIDDLE, true, false);
+        getMainPanel().drawTitle(getEditorTitle(), Constants.COLOR_WHITE, false);
 
         // Labels — "Name:" and "Bild auswählen:" at same height
         getMainPanel().drawString(Localization.getInstance().getCommon().get("custom_editor_name"), 30, LABEL_Y, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);

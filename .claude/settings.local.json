@@ -14,7 +14,8 @@
       "WebFetch(domain:medium.com)",
       "WebFetch(domain:www.postman.com)",
       "WebFetch(domain:help.elevenlabs.io)",
-      "WebFetch(domain:wavespeed.ai)"
+      "WebFetch(domain:wavespeed.ai)",
+      "Bash(sed:*)"
     ]
   }
 }

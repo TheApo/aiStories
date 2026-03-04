@@ -289,9 +289,7 @@ public class CreativeTonie extends SequentiallyThinkingScreenModel implements Ma
 
         getMainPanel().getRenderer().end();
 
-        getMainPanel().spriteBatch.begin();
-
-        getMainPanel().drawString(Localization.getInstance().getCommon().get("tonie"), Constants.GAME_WIDTH / 2f, 40, Constants.COLOR_WHITE, AssetLoader.font40, DrawString.MIDDLE, true, false);
+        getMainPanel().drawTitle(Localization.getInstance().getCommon().get("tonie"), Constants.COLOR_WHITE, false);
 
         float time = 0;
 

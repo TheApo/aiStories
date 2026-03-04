@@ -39,6 +39,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.GridPoint2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.viewport.FitViewport;
@@ -333,6 +334,28 @@ public class GameScreen implements Screen, InputProcessor {
         if (bNewSpriteBatch) {
             spriteBatch.end();
         }
+    }
+
+    public void drawTitle(String title, float[] titleColor, boolean bSpriteBatchActive) {
+        if (bSpriteBatchActive) {
+            spriteBatch.end();
+        }
+
+        glyphLayout.setText(AssetLoader.fontTitle, title);
+        float bannerWidth = glyphLayout.width + 80;
+        float bannerHeight = 55;
+        float bannerX = Constants.GAME_WIDTH / 2f - bannerWidth / 2f;
+        float bannerY = 10;
+
+        Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
+        renderer.begin(ShapeRenderer.ShapeType.Filled);
+        renderer.setColor(0f, 0f, 0f, 0.5f);
+        renderer.roundedRect(bannerX, bannerY, bannerWidth, bannerHeight, 12);
+        renderer.end();
+        Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
+
+        spriteBatch.begin();
+        drawString(title, Constants.GAME_WIDTH / 2f, 15, titleColor, AssetLoader.fontTitle, DrawString.MIDDLE, false, false);
     }
 
     @Override

@@ -31,13 +31,23 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 
 /**
  * The type Asset loader.
  */
 public class AssetLoader {
 
-    public static final String FONT_CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789][_!$%#@|\\/?-+=()*&.;,{}\"´`'<>";
+    public static final String FONT_CHARACTERS = FreeTypeFontGenerator.DEFAULT_CHARS
+            + "\u00A1\u00A2\u00A3\u00A4\u00A5\u00A6\u00A7\u00A8\u00A9\u00AA\u00AB\u00AC\u00AD\u00AE\u00AF"
+            + "\u00B0\u00B1\u00B2\u00B3\u00B4\u00B5\u00B6\u00B7\u00B8\u00B9\u00BA\u00BB\u00BC\u00BD\u00BE\u00BF"
+            + "\u00C0\u00C1\u00C2\u00C3\u00C4\u00C5\u00C6\u00C7\u00C8\u00C9\u00CA\u00CB\u00CC\u00CD\u00CE\u00CF"
+            + "\u00D0\u00D1\u00D2\u00D3\u00D4\u00D5\u00D6\u00D7\u00D8\u00D9\u00DA\u00DB\u00DC\u00DD\u00DE\u00DF"
+            + "\u00E0\u00E1\u00E2\u00E3\u00E4\u00E5\u00E6\u00E7\u00E8\u00E9\u00EA\u00EB\u00EC\u00ED\u00EE\u00EF"
+            + "\u00F0\u00F1\u00F2\u00F3\u00F4\u00F5\u00F6\u00F7\u00F8\u00F9\u00FA\u00FB\u00FC\u00FD\u00FE\u00FF"
+            + "\u011E\u011F\u0130\u0131\u015E\u015F"
+            + "\u2013\u2014\u2018\u2019\u201A\u201C\u201D\u201E\u2026\u2022\u20AC";
     public static TextureRegion backgroundTextureRegion;
     public static TextureRegion backgroundMenuTextureRegion;
     public static TextureRegion[] buttonBlancoTextureRegion;
@@ -55,6 +65,7 @@ public class AssetLoader {
     public static BitmapFont font10;
     public static BitmapFont font25;
     public static BitmapFont font30;
+    public static BitmapFont fontTitle;
     private static Texture backgroundTexture;
     private static Texture backgroundMenuTexture;
     private static Texture buttonBlancoTexture;
@@ -195,12 +206,26 @@ public class AssetLoader {
             }
         }
 
-        font40 = new BitmapFont(Gdx.files.internal("fonts/pirate40.fnt"), Gdx.files.internal("fonts/pirate40.png"), true);
-        font20 = new BitmapFont(Gdx.files.internal("fonts/pirate20.fnt"), Gdx.files.internal("fonts/pirate20.png"), true);
-        font15 = new BitmapFont(Gdx.files.internal("fonts/pirate15.fnt"), Gdx.files.internal("fonts/pirate15.png"), true);
-        font10 = new BitmapFont(Gdx.files.internal("fonts/pirate10.fnt"), Gdx.files.internal("fonts/pirate10.png"), true);
-        font25 = new BitmapFont(Gdx.files.internal("fonts/pirate25.fnt"), Gdx.files.internal("fonts/pirate25.png"), true);
-        font30 = new BitmapFont(Gdx.files.internal("fonts/pirate30.fnt"), Gdx.files.internal("fonts/pirate30.png"), true);
+        FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("fonts/OpenSans.ttf"));
+        font10 = generateFont(generator, 10);
+        font15 = generateFont(generator, 15);
+        font20 = generateFont(generator, 20);
+        font25 = generateFont(generator, 25);
+        font30 = generateFont(generator, 30);
+        font40 = generateFont(generator, 40);
+        fontTitle = generateFont(generator, 48);
+        generator.dispose();
+    }
+
+    private static BitmapFont generateFont(FreeTypeFontGenerator generator, int size) {
+        FreeTypeFontParameter param = new FreeTypeFontParameter();
+        param.size = size;
+        param.flip = true;
+        param.characters = FONT_CHARACTERS;
+        param.minFilter = Texture.TextureFilter.Linear;
+        param.magFilter = Texture.TextureFilter.Linear;
+        param.genMipMaps = true;
+        return generator.generateFont(param);
     }
 
     public static void dispose() {
@@ -221,7 +246,8 @@ public class AssetLoader {
         font25.dispose();
         font20.dispose();
         font15.dispose();
-//        click.dispose();
+        font10.dispose();
+        fontTitle.dispose();
     }
 
 }
