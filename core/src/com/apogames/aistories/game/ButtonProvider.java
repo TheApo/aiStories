@@ -253,8 +253,8 @@ public class ButtonProvider {
             // Tonie upload button - below book
             text = "";
             function = ListenStories.FUNCTION_UPLOAD_TONIE;
-            width = 130;
-            height = 156;
+            width = 180;
+            height = 216;
             x = 65;
             y = 578;
             button = new ApoButtonImage(x, y, width, height, function, "", AssetLoader.tonieTextureRegion);

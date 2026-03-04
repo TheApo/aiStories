@@ -81,7 +81,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private final PageTurnAnimation pageAnimation = new PageTurnAnimation();
 
     private static final int ROW1_Y_NORMAL = 580;
-    private static final int ROW2_Y = 665;
+    private static final int ROW2_Y = 700;
     private static final int ROW1_Y_EXTENDED = 660;
     private static final int ROW_HEIGHT = 70;
     private static final int ROW_BG_WIDTH = 560;
