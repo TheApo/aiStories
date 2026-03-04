@@ -822,6 +822,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private void stopMusic() {
         if (this.music != null) {
             this.music.stop();
+            this.music.setPosition(0);
         }
         this.lastRenderedSecond = -1;
         this.highlighter = null;

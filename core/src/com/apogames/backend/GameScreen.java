@@ -343,7 +343,7 @@ public class GameScreen implements Screen, InputProcessor {
 
         glyphLayout.setText(AssetLoader.fontTitle, title);
         float bannerWidth = glyphLayout.width + 80;
-        float bannerHeight = 55;
+        float bannerHeight = 60;
         float bannerX = Constants.GAME_WIDTH / 2f - bannerWidth / 2f;
         float bannerY = 10;
 
@@ -355,7 +355,7 @@ public class GameScreen implements Screen, InputProcessor {
         Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
 
         spriteBatch.begin();
-        drawString(title, Constants.GAME_WIDTH / 2f, 15, titleColor, AssetLoader.fontTitle, DrawString.MIDDLE, false, false);
+        drawString(title, Constants.GAME_WIDTH / 2f, 20, titleColor, AssetLoader.fontTitle, DrawString.MIDDLE, false, false);
     }
 
     @Override
