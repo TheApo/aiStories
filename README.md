@@ -22,8 +22,9 @@ With optional API keys you can unlock additional features step by step:
 
 <p>
   <a href="screenshots/aiStories_1.png"><img src="screenshots/aiStories_1.png" width="30%"></a>
-  <a href="screenshots/aiStories_2.png"><img src="screenshots/aiStories_2.png" width="30%"></a>
   <a href="screenshots/aiStories_3.png"><img src="screenshots/aiStories_3.png" width="30%"></a>
+  <a href="screenshots/aiStories_2.png"><img src="screenshots/aiStories_2.png" width="30%"></a>
+  <a href="screenshots/aiStories_6.png"><img src="screenshots/aiStories_6.png" width="30%"></a>
   <a href="screenshots/aiStories_4.png"><img src="screenshots/aiStories_4.png" width="30%"></a>
   <a href="screenshots/aiStories_5.png"><img src="screenshots/aiStories_5.png" width="30%"></a>
 </p>
