@@ -8,6 +8,7 @@ import com.apogames.aistories.game.listenStories.ListenStories;
 import com.apogames.aistories.game.main.ChatGPTIO;
 import com.apogames.aistories.game.main.Prompt;
 import com.apogames.aistories.game.menu.Menu;
+import com.apogames.aistories.game.customEntity.CustomImageManager;
 import com.apogames.aistories.game.objects.*;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
@@ -76,6 +77,14 @@ public class MainPanel extends GameScreen {
         this.customUniverse = new CustomEntity("universe");
         this.customPlaces = new CustomEntity("places");
         this.customObjectives = new CustomEntity("objectives");
+
+        CustomImageManager sharedCharacterImages = new CustomImageManager("characters");
+        this.customMainEntity.setCustomImageManager(sharedCharacterImages);
+        this.customSupportingEntity.setCustomImageManager(sharedCharacterImages);
+        this.customUniverse.setCustomImageManager(new CustomImageManager("universe"));
+        this.customPlaces.setCustomImageManager(new CustomImageManager("places"));
+        this.customObjectives.setCustomImageManager(new CustomImageManager("objectives"));
+
         loadCustomEntityPreferences();
 
         if (this.createStory == null) {

@@ -15,7 +15,13 @@
       "WebFetch(domain:www.postman.com)",
       "WebFetch(domain:help.elevenlabs.io)",
       "WebFetch(domain:wavespeed.ai)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:ai.google.dev)",
+      "WebFetch(domain:cookbook.openai.com)",
+      "WebFetch(domain:blog.laozhang.ai)",
+      "WebFetch(domain:developers.openai.com)",
+      "WebFetch(domain:yingtu.ai)"
     ]
   }
 }

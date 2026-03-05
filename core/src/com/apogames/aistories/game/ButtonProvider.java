@@ -39,6 +39,8 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 
 public class ButtonProvider {
 
+    private static final int PANEL_Y = 90;
+
     private final MainPanel game;
 
     public ButtonProvider(MainPanel game) {
@@ -106,12 +108,13 @@ public class ButtonProvider {
 
             text = "LLM";
             function = CreateStory.FUNCTION_LLM;
-            width = 60;
-            height = 40;
+            width = 70;
+            height = 36;
             x = Constants.GAME_WIDTH - width - 250;
-            y = 15;
+            y = 17;
             button = new ApoButtonSwitch(x, y, width, height, function, Constants.COLOR_WHITE, Constants.COLOR_BLACK);
-            button.setFont(AssetLoader.font15);
+            ((ApoButtonSwitch) button).setLabels("GPT-5-mini", "Gemini-3");
+            button.setFont(AssetLoader.font20);
             this.game.getButtons().add(button);
 
             text = "TONIE";
@@ -313,6 +316,62 @@ public class ButtonProvider {
             y = Constants.GAME_HEIGHT - height - 30;
             button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "custom_editor_confirm");
             button.setFont(AssetLoader.font25);
+            this.game.getButtons().add(button);
+
+            // AI image generation button (cloud style, at title level)
+            text = "AI";
+            function = CustomEntityEditor.FUNCTION_AI_GENERATE;
+            width = 200;
+            height = 50;
+            x = Constants.GAME_WIDTH - width - 100;
+            y = 15;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "custom_editor_ai_button");
+            button.setFont(AssetLoader.font20);
+            this.game.getButtons().add(button);
+
+            // Manage custom images button (cloud style, at title level)
+            text = "Manage";
+            function = CustomEntityEditor.FUNCTION_MANAGE;
+            width = 200;
+            height = 50;
+            x = 15;
+            y = 15;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "custom_editor_manage_button");
+            button.setFont(AssetLoader.font20);
+            this.game.getButtons().add(button);
+
+            // Back to grid from generate/manage mode (cloud style, at title level)
+            text = "Back";
+            function = CustomEntityEditor.FUNCTION_BACK_TO_GRID;
+            width = 200;
+            height = 50;
+            x = Constants.GAME_WIDTH - width - 100;
+            y = 15;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "custom_editor_back_grid");
+            button.setFont(AssetLoader.font20);
+            this.game.getButtons().add(button);
+
+            // Generate button (cloud style, in generate mode)
+            text = "Generate";
+            function = CustomEntityEditor.FUNCTION_DO_GENERATE;
+            width = 350;
+            height = 64;
+            x = 450 + (Constants.GAME_WIDTH - 450) / 2 - width / 2;
+            y = Constants.GAME_HEIGHT - height - 40;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "custom_editor_generate");
+            button.setFont(AssetLoader.font25);
+            this.game.getButtons().add(button);
+
+            // LLM switch for image generation (centered above generate button)
+            text = "LLM";
+            function = CustomEntityEditor.FUNCTION_LLM_SWITCH;
+            width = 70;
+            height = 36;
+            x = 450 + (Constants.GAME_WIDTH - 450) / 2 - width / 2;
+            y = Constants.GAME_HEIGHT - 64 - 40 - 75;
+            button = new ApoButtonSwitch(x, y, width, height, function, Constants.COLOR_WHITE, Constants.COLOR_BLACK);
+            ((ApoButtonSwitch) button).setLabels("GPT-5-mini", "Gemini-3");
+            button.setFont(AssetLoader.font20);
             this.game.getButtons().add(button);
 
             for (int i = 0; i < this.game.getButtons().size(); i++) {

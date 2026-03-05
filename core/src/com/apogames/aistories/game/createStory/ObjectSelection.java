@@ -8,7 +8,7 @@ import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
 import com.apogames.backend.GameScreen;
 import com.apogames.common.Localization;
-import com.apogames.entity.ApoButtonColor;
+import com.apogames.entity.ApoButtonEditIcon;
 import com.apogames.entity.ApoButtonMovement;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import lombok.Getter;
@@ -45,7 +45,7 @@ public class ObjectSelection implements ObjectSelectionInterface {
 
     private final ApoButtonMovement upButton;
     private final ApoButtonMovement downButton;
-    private ApoButtonColor jumpCustomButton;
+    private ApoButtonEditIcon jumpCustomButton;
     @Getter
     private CustomEntity customEntity;
 
@@ -112,13 +112,13 @@ public class ObjectSelection implements ObjectSelectionInterface {
             this.customEntity = customEntity;
 
             function = this.id + "_" + JUMPCUSTOM;
-            int custButtonWidth = 140;
-            int custButtonHeight = 30;
-            int custButtonX = x + width / 2 - custButtonWidth / 2;
-            int custButtonY = y + height + 5;
-            this.jumpCustomButton = new ApoButtonColor(custButtonX, custButtonY, custButtonWidth, custButtonHeight, function, Localization.getInstance().getCommon().get("button_customize"), Constants.COLOR_WHITE, Constants.COLOR_BLACK);
-            this.jumpCustomButton.setStroke(1);
-            this.jumpCustomButton.setFont(AssetLoader.font15);
+            int editSize = 48;
+            // Position on bottom-right corner of the character image (200x200, centered in column)
+            int imageRight = x + width / 2 + 100;
+            int imageBottom = y + height / 2 + 100 - 50;
+            int editX = imageRight - editSize + 8;
+            int editY = imageBottom - editSize + 8;
+            this.jumpCustomButton = new ApoButtonEditIcon(editX, editY, editSize, function, this.background_color, Constants.COLOR_BLACK);
             this.jumpCustomButton.setVisible(false);
             main.getButtons().add(this.jumpCustomButton);
         }
@@ -195,7 +195,7 @@ public class ObjectSelection implements ObjectSelectionInterface {
 
         if (this.gameObjective.getImage() != null) {
             screen.getRenderer().setColor(color[0], color[1], color[2], 1f);
-            screen.getRenderer().rect(this.x + changeX + this.width / 2f - this.gameObjective.getImage().getRegionWidth() / 2f - 2, this.y + changeY + this.height / 2f - this.gameObjective.getImage().getRegionHeight() / 2f - 20 - 2, this.gameObjective.getImage().getRegionWidth() + 4, this.gameObjective.getImage().getRegionHeight() + 4);
+            screen.getRenderer().rect(this.x + changeX + this.width / 2f - this.gameObjective.getImage().getRegionWidth() / 2f - 2, this.y + changeY + this.height / 2f - this.gameObjective.getImage().getRegionHeight() / 2f - 50 - 2, this.gameObjective.getImage().getRegionWidth() + 4, this.gameObjective.getImage().getRegionHeight() + 4);
         }
     }
 
@@ -224,7 +224,7 @@ public class ObjectSelection implements ObjectSelectionInterface {
         if (screen.getGlyphLayout().width > this.width - 20) {
             font = AssetLoader.font20;
         }
-        screen.drawString(displayName, this.x + changeX + this.width / 2f, this.y + changeY + this.height - 160, BACKGROUND_BORDER_COLOR, font, DrawString.MIDDLE, true, false);
+        screen.drawString(displayName, this.x + changeX + this.width / 2f, this.y + changeY + this.height - 220, BACKGROUND_BORDER_COLOR, font, DrawString.MIDDLE, true, false);
 
         // Use getDisplayDetails() for the details (supports custom characters)
         String details = this.gameObjective.getDisplayDetails();
@@ -235,11 +235,11 @@ public class ObjectSelection implements ObjectSelectionInterface {
             startY -= 15 * (lineCount - 3);
         }
         for (int i = 0; i < lineCount; i++) {
-            screen.drawString(wrappedLines.get(i), this.x + changeX + this.width / 2f, this.y + changeY + startY + this.height - 110 + i * 15, BACKGROUND_BORDER_COLOR, AssetLoader.font15, DrawString.MIDDLE, true, false);
+            screen.drawString(wrappedLines.get(i), this.x + changeX + this.width / 2f, this.y + changeY + startY + this.height - 140 + i * 15, BACKGROUND_BORDER_COLOR, AssetLoader.font15, DrawString.MIDDLE, true, false);
         }
 
         if (this.gameObjective.getImage() != null) {
-            screen.spriteBatch.draw(this.gameObjective.getImage(), this.x + changeX + this.width / 2f - this.gameObjective.getImage().getRegionWidth() / 2f, this.y + changeY + this.height / 2f - this.gameObjective.getImage().getRegionHeight() / 2f - 20);
+            screen.spriteBatch.draw(this.gameObjective.getImage(), this.x + changeX + this.width / 2f - this.gameObjective.getImage().getRegionWidth() / 2f, this.y + changeY + this.height / 2f - this.gameObjective.getImage().getRegionHeight() / 2f - 50);
         }
     }
 

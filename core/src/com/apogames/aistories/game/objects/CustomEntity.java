@@ -1,5 +1,6 @@
 package com.apogames.aistories.game.objects;
 
+import com.apogames.aistories.game.customEntity.CustomImageManager;
 import com.apogames.asset.AssetLoader;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import lombok.Getter;
@@ -13,6 +14,7 @@ public class CustomEntity implements EnumInterface {
     private String customDetails;
     private int imageIndex;
     private final String enumName;
+    private CustomImageManager customImageManager;
 
     public CustomEntity(String enumName) {
         this.enumName = enumName;
@@ -49,7 +51,7 @@ public class CustomEntity implements EnumInterface {
         }
     }
 
-    public int getTotalImages() {
+    public int getBuiltInImageCount() {
         int total = 0;
         for (TextureRegion[] arr : getTextureArrays()) {
             total += arr.length;
@@ -57,14 +59,34 @@ public class CustomEntity implements EnumInterface {
         return total;
     }
 
+    public int getCustomImageCount() {
+        return customImageManager != null ? customImageManager.getCount() : 0;
+    }
+
+    public int getTotalImages() {
+        return getBuiltInImageCount() + getCustomImageCount();
+    }
+
     public TextureRegion getTextureByIndex(int index) {
-        for (TextureRegion[] arr : getTextureArrays()) {
-            if (index < arr.length) {
-                return arr[index];
+        int builtIn = getBuiltInImageCount();
+        if (index < builtIn) {
+            for (TextureRegion[] arr : getTextureArrays()) {
+                if (index < arr.length) {
+                    return arr[index];
+                }
+                index -= arr.length;
             }
-            index -= arr.length;
+            return getTextureArrays()[0][0];
+        }
+        int customIdx = index - builtIn;
+        if (customImageManager != null && customIdx < customImageManager.getCount()) {
+            return customImageManager.getTexture(customIdx);
         }
         return getTextureArrays()[0][0];
+    }
+
+    public boolean isCustomImage(int index) {
+        return index >= getBuiltInImageCount();
     }
 
     @Override

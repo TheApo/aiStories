@@ -35,7 +35,11 @@ public class ChatGPTIO {
     public ChatGPTIO(MainInterface main) {
         this.main = main;
         conversationHistory = new ArrayList<>();
-        this.llm = LLM_MODEL_MINI;
+        if (GEMINI_API_KEY != null && !GEMINI_API_KEY.isEmpty() && !GEMINI_API_KEY.equals("Dein Gemini API Key")) {
+            this.llm = LLM_MODEL_GEMINI;
+        } else {
+            this.llm = LLM_MODEL_MINI;
+        }
         this.reset();
     }
 

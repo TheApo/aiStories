@@ -9,7 +9,6 @@ import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
 import com.apogames.common.Localization;
 import com.apogames.entity.ApoButton;
-import com.apogames.entity.ApoButtonSwitch;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -51,6 +50,8 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
             this.singleLlmName = null;
         } else if (hasOpenAI && hasGemini) {
             this.singleLlmName = null;
+            getMainPanel().getButtonByFunction(FUNCTION_LLM).setSelect(
+                    this.getMainPanel().getChatGPT().getLlm().startsWith("gemini"));
         } else {
             getMainPanel().getButtonByFunction(FUNCTION_LLM).setVisible(false);
             if (hasGemini) {
@@ -87,23 +88,23 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
             this.objectSelection = new ArrayList<>();
 
             // MainCharacter with custom character support
-            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10, 85, 250, 550,
+            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getMainCharacter(),
                     Constants.COLOR_MAIN_CHARACTER, MainCharacter.values(), this.getMainPanel().getCustomMainEntity()));
 
             // SupportingCharacter with custom character support
-            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270, 85, 250, 550,
+            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getSupportingCharacter(),
                     Constants.COLOR_SIDE_CHARACTER, SupportingCharacter.values(), this.getMainPanel().getCustomSupportingEntity()));
 
             // Universe, Places, Objectives - with custom support
-            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 2, 85, 250, 550,
+            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 2, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getUniverse(),
                     Constants.COLOR_UNIVERSE, Universe.values(), this.getMainPanel().getCustomUniverse()));
-            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 3, 85, 250, 550,
+            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 3, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getPlaces(),
                     Constants.COLOR_PLACES, Places.values(), this.getMainPanel().getCustomPlaces()));
-            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 4, 85, 250, 550,
+            this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 4, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getObjectives(),
                     Constants.COLOR_OBJECTIVES, Objectives.values(), this.getMainPanel().getCustomObjectives()));
         }
@@ -258,9 +259,7 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         for (ApoButton button : this.getMainPanel().getButtons()) {
             button.render(this.getMainPanel());
             if (button.getFunction().equals(FUNCTION_LLM)) {
-                if (button.isVisible()) {
-                    ((ApoButtonSwitch) (button)).renderText(getMainPanel(), 0, 0, this.getMainPanel().getChatGPT().getLlm());
-                } else if (this.singleLlmName != null) {
+                if (!button.isVisible() && this.singleLlmName != null) {
                     getMainPanel().drawString(this.singleLlmName, button.getX() + button.getWidth() / 2f, button.getY() + button.getHeight() / 2f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, true);
                 }
             }
