@@ -154,11 +154,18 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         getMainPanel().getButtonByFunction(FUNCTION_BACK_TO_GRID).setVisible(currentMode != Mode.GRID);
         getMainPanel().getButtonByFunction(FUNCTION_DO_GENERATE).setVisible(currentMode == Mode.GENERATE && !isGenerating);
 
-        boolean showLlmSwitch = currentMode == Mode.GENERATE && hasOpenAI() && hasGemini() && !isGenerating;
-        getMainPanel().getButtonByFunction(FUNCTION_LLM_SWITCH).setVisible(showLlmSwitch);
-        if (showLlmSwitch) {
-            getMainPanel().getButtonByFunction(FUNCTION_LLM_SWITCH).setSelect(
-                    imageLlm != null && imageLlm.startsWith("gemini"));
+        com.apogames.entity.ApoButtonSwitch llmSwitch = (com.apogames.entity.ApoButtonSwitch) getMainPanel().getButtonByFunction(FUNCTION_LLM_SWITCH);
+        boolean showLlm = currentMode == Mode.GENERATE && !isGenerating && (hasOpenAI() || hasGemini());
+        llmSwitch.setVisible(showLlm);
+        if (showLlm) {
+            if (hasOpenAI() && hasGemini()) {
+                llmSwitch.setLabels("GPT-5-mini", "Gemini-3");
+                llmSwitch.setSelect(imageLlm != null && imageLlm.startsWith("gemini"));
+            } else if (hasGemini()) {
+                llmSwitch.setSingleLabel("Gemini-3");
+            } else {
+                llmSwitch.setSingleLabel("GPT-5-mini");
+            }
         }
     }
 

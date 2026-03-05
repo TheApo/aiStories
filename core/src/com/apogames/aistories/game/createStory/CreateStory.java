@@ -9,6 +9,7 @@ import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
 import com.apogames.common.Localization;
 import com.apogames.entity.ApoButton;
+import com.apogames.entity.ApoButtonSwitch;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -28,7 +29,6 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
     private boolean isPressed = false;
 
-    private String singleLlmName;
 
     private ArrayList<ObjectSelection> objectSelection;
 
@@ -44,22 +44,20 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
         boolean hasOpenAI = ChatGPTIO.API_KEY != null && !ChatGPTIO.API_KEY.isEmpty() && !ChatGPTIO.API_KEY.equals("Dein ChatGPT API Key");
         boolean hasGemini = ChatGPTIO.GEMINI_API_KEY != null && !ChatGPTIO.GEMINI_API_KEY.isEmpty() && !ChatGPTIO.GEMINI_API_KEY.equals("Dein Gemini API Key");
+        ApoButtonSwitch llmButton = (ApoButtonSwitch) getMainPanel().getButtonByFunction(FUNCTION_LLM);
         if (!hasOpenAI && !hasGemini) {
             getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setVisible(false);
-            getMainPanel().getButtonByFunction(FUNCTION_LLM).setVisible(false);
-            this.singleLlmName = null;
+            llmButton.setVisible(false);
         } else if (hasOpenAI && hasGemini) {
-            this.singleLlmName = null;
-            getMainPanel().getButtonByFunction(FUNCTION_LLM).setSelect(
-                    this.getMainPanel().getChatGPT().getLlm().startsWith("gemini"));
+            llmButton.setLabels("GPT-5-mini", "Gemini-3");
+            llmButton.setSelect(this.getMainPanel().getChatGPT().getLlm().startsWith("gemini"));
         } else {
-            getMainPanel().getButtonByFunction(FUNCTION_LLM).setVisible(false);
             if (hasGemini) {
                 this.getMainPanel().getChatGPT().setLlm(ChatGPTIO.LLM_MODEL_GEMINI);
-                this.singleLlmName = ChatGPTIO.LLM_MODEL_GEMINI;
+                llmButton.setSingleLabel("Gemini-3");
             } else {
                 this.getMainPanel().getChatGPT().setLlm(ChatGPTIO.LLM_MODEL_MINI);
-                this.singleLlmName = ChatGPTIO.LLM_MODEL_MINI;
+                llmButton.setSingleLabel("GPT-5-mini");
             }
         }
 
@@ -258,11 +256,6 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
         for (ApoButton button : this.getMainPanel().getButtons()) {
             button.render(this.getMainPanel());
-            if (button.getFunction().equals(FUNCTION_LLM)) {
-                if (!button.isVisible() && this.singleLlmName != null) {
-                    getMainPanel().drawString(this.singleLlmName, button.getX() + button.getWidth() / 2f, button.getY() + button.getHeight() / 2f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, true);
-                }
-            }
         }
     }
 

@@ -13,6 +13,7 @@ public class ApoButtonSwitch extends ApoButtonColor {
 
     private String leftLabel;
     private String rightLabel;
+    private String singleLabel;
 
     public ApoButtonSwitch(int x, int y, int width, int height, String function, float[] color, float[] colorBorder) {
         super(x, y, width, height, function, "", color, colorBorder);
@@ -25,6 +26,13 @@ public class ApoButtonSwitch extends ApoButtonColor {
     public void setLabels(String leftLabel, String rightLabel) {
         this.leftLabel = leftLabel;
         this.rightLabel = rightLabel;
+        this.singleLabel = null;
+    }
+
+    public void setSingleLabel(String label) {
+        this.singleLabel = label;
+        this.leftLabel = null;
+        this.rightLabel = null;
     }
 
     public void render(GameScreen screen, int changeX, int changeY) {
@@ -35,11 +43,35 @@ public class ApoButtonSwitch extends ApoButtonColor {
         float by = this.getY() + changeY;
         float w = getWidth();
         float h = getHeight();
-        float radius = h / 2f;
-        float knobRadius = radius - 4;
 
         BitmapFont labelFont = AssetLoader.font20;
+
+        // Single label mode: just background panel + centered text, no track/knob
+        if (singleLabel != null) {
+            Constants.glyphLayout.setText(labelFont, singleLabel);
+            float textW = Constants.glyphLayout.width;
+            float panelPad = 20;
+            float panelW = textW + 2 * panelPad;
+            float panelH = h + 14;
+            float panelX = bx + w / 2f - panelW / 2f;
+            float panelY = by - 7;
+
+            Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
+            screen.getRenderer().begin(ShapeType.Filled);
+            screen.getRenderer().setColor(0f, 0f, 0f, 0.55f);
+            screen.getRenderer().roundedRect(panelX, panelY, panelW, panelH, panelH / 2f);
+            screen.getRenderer().end();
+            Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
+
+            screen.spriteBatch.begin();
+            screen.drawString(singleLabel, bx + w / 2f, by + h / 2f, Constants.COLOR_YELLOW, labelFont, DrawString.MIDDLE, true, false);
+            screen.spriteBatch.end();
+            return;
+        }
+
         boolean hasLabels = leftLabel != null && rightLabel != null;
+        float radius = h / 2f;
+        float knobRadius = radius - 4;
 
         float leftW = 0;
         float rightW = 0;
@@ -68,7 +100,7 @@ public class ApoButtonSwitch extends ApoButtonColor {
             Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
         }
 
-        // Track (pill shape, neutral color — it's a toggle between two options, not on/off)
+        // Track (pill shape, neutral color)
         screen.getRenderer().begin(ShapeType.Filled);
         screen.getRenderer().setColor(0.4f, 0.4f, 0.4f, 1f);
         screen.getRenderer().roundedRect(bx, by, w, h, radius);
