@@ -90,22 +90,18 @@ public class ObjectSelection implements ObjectSelectionInterface {
         }
 
         String function = this.id + "_" + UP;
-        int buttonWidth = 128;
-        int buttonHeight = 64;
+        int buttonWidth = 140;
+        int buttonHeight = 60;
         int buttonX = x + width / 2 - buttonWidth / 2;
         int buttonY = y + 5;
-        this.upButton = new ApoButtonMovement(buttonX, buttonY, buttonWidth, buttonHeight, function, BACKGROUND_COLOR, Constants.COLOR_GREY);
-        this.upButton.setStroke(1);
+        this.upButton = new ApoButtonMovement(buttonX, buttonY, buttonWidth, buttonHeight, function, color, Constants.COLOR_WHITE);
         this.upButton.setMovement(ApoButtonMovement.MOVEMENT.UP);
-        this.upButton.setFont(AssetLoader.font40);
         main.getButtons().add(this.upButton);
 
         function = this.id + "_" + DOWN;
         buttonY = y + height - buttonHeight - 5;
-        this.downButton = new ApoButtonMovement(buttonX, buttonY, buttonWidth, buttonHeight, function, BACKGROUND_COLOR, Constants.COLOR_GREY);
-        this.downButton.setStroke(1);
+        this.downButton = new ApoButtonMovement(buttonX, buttonY, buttonWidth, buttonHeight, function, color, Constants.COLOR_WHITE);
         this.downButton.setMovement(ApoButtonMovement.MOVEMENT.DOWN);
-        this.downButton.setFont(AssetLoader.font40);
         main.getButtons().add(this.downButton);
 
         if (customEntity != null) {
