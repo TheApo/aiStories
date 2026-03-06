@@ -627,16 +627,16 @@ public class Textfield extends ApoButton {
     }
 
     private void renderSingleLine(GameScreen screen, int changeX, int changeY) {
-        if ((this.selectedPosition.x > -1) && (this.selectedPosition.y > -1)) {
-            screen.getRenderer().begin(ShapeType.Line);
-            screen.getRenderer().setColor(0.5f, 0.5f, 0.5f, 1f);
+        if ((this.selectedPosition.x > -1) && (this.selectedPosition.y > -1) && (this.selectedPosition.x != this.selectedPosition.y)) {
             String s = this.curString.substring(0, this.selectedPosition.x);
             glyphLayout.setText(myFont, s);
             float x = glyphLayout.width + (int) (this.getX() + 5 + changeX);
             s = this.curString.substring(this.selectedPosition.x, this.selectedPosition.y);
             glyphLayout.setText(myFont, s);
             float width = glyphLayout.width;
-            screen.getRenderer().rect(x, this.getY() + changeY + 1, (width), (this.getHeight() - 2));
+            screen.getRenderer().begin(ShapeType.Filled);
+            screen.getRenderer().setColor(SELECTED_COLOR[0], SELECTED_COLOR[1], SELECTED_COLOR[2], 0.3f);
+            screen.getRenderer().rect(x, this.getY() + changeY + 1, width, this.getHeight() - 2);
             screen.getRenderer().end();
         }
 
@@ -674,6 +674,39 @@ public class Textfield extends ApoButton {
 
         float lineHeight = getMultiLineHeight();
         float textStartY = this.getY() + changeY + 5;
+        float fieldX = this.getX() + 5 + changeX;
+
+        // Draw selection highlight
+        if ((this.selectedPosition.x > -1) && (this.selectedPosition.y > -1) && (this.selectedPosition.x != this.selectedPosition.y)) {
+            int selStart = this.selectedPosition.x;
+            int selEnd = this.selectedPosition.y;
+
+            screen.getRenderer().begin(ShapeType.Filled);
+            screen.getRenderer().setColor(SELECTED_COLOR[0], SELECTED_COLOR[1], SELECTED_COLOR[2], 0.3f);
+
+            for (int i = 0; i < lineTexts.size(); i++) {
+                float lineY = textStartY + i * lineHeight;
+                if (lineY + lineHeight > this.getY() + changeY + this.getHeight()) break;
+
+                int lineStart = lineStarts[i];
+                int lineEnd = lineStart + lineTexts.get(i).length();
+
+                if (selEnd <= lineStart || selStart >= lineEnd) continue;
+
+                int hlStart = Math.max(selStart, lineStart) - lineStart;
+                int hlEnd = Math.min(selEnd, lineEnd) - lineStart;
+
+                String before = lineTexts.get(i).substring(0, hlStart);
+                String selected = lineTexts.get(i).substring(hlStart, hlEnd);
+                glyphLayout.setText(myFont, before.isEmpty() ? "" : before);
+                float xStart = before.isEmpty() ? 0 : glyphLayout.width;
+                glyphLayout.setText(myFont, selected);
+                float selWidth = glyphLayout.width;
+
+                screen.getRenderer().rect(fieldX + xStart, lineY, selWidth, lineHeight);
+            }
+            screen.getRenderer().end();
+        }
 
         // Draw each line
         for (int i = 0; i < lineTexts.size(); i++) {
@@ -681,7 +714,7 @@ public class Textfield extends ApoButton {
             if (lineY + lineHeight > this.getY() + changeY + this.getHeight()) break;
             String line = lineTexts.get(i);
             if (!line.isEmpty()) {
-                screen.drawString(line, this.getX() + 5 + changeX, lineY, color, myFont, false);
+                screen.drawString(line, fieldX, lineY, color, myFont, false);
             }
         }
 

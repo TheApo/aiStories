@@ -24,6 +24,7 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
     public static final String FUNCTION_GENERATE_TEXT = "CREATESTORY_START";
     public static final String FUNCTION_NEWPROMPT = "CREATESTORY_NEWPROMPT";
+    public static final String FUNCTION_SETTINGS = "CREATESTORY_SETTINGS";
 
     private final boolean[] keys = new boolean[256];
 
@@ -41,6 +42,7 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         getMainPanel().getButtonByFunction(FUNCTION_LLM).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_NEWPROMPT).setVisible(true);
+        getMainPanel().getButtonByFunction(FUNCTION_SETTINGS).setVisible(true);
 
         boolean hasOpenAI = ChatGPTIO.API_KEY != null && !ChatGPTIO.API_KEY.isEmpty() && !ChatGPTIO.API_KEY.equals("Dein ChatGPT API Key");
         boolean hasGemini = ChatGPTIO.GEMINI_API_KEY != null && !ChatGPTIO.GEMINI_API_KEY.isEmpty() && !ChatGPTIO.GEMINI_API_KEY.equals("Dein Gemini API Key");
@@ -179,6 +181,9 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
                 break;
             case CreateStory.FUNCTION_NEWPROMPT:
                 shufflePrompt();
+                break;
+            case CreateStory.FUNCTION_SETTINGS:
+                getMainPanel().changeToStorySettings();
                 break;
         }
     }

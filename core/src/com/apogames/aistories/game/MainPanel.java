@@ -8,6 +8,8 @@ import com.apogames.aistories.game.listenStories.ListenStories;
 import com.apogames.aistories.game.main.ChatGPTIO;
 import com.apogames.aistories.game.main.Prompt;
 import com.apogames.aistories.game.menu.Menu;
+import com.apogames.aistories.game.settings.StorySettings;
+import com.apogames.aistories.game.settings.StorySettingsScreen;
 import com.apogames.aistories.game.customEntity.CustomImageManager;
 import com.apogames.aistories.game.objects.*;
 import com.apogames.asset.AssetLoader;
@@ -47,6 +49,9 @@ public class MainPanel extends GameScreen {
     private CreativeTonie creativeTonie;
     private CustomEntityEditor customEntityEditor;
     private Menu menu;
+    private StorySettingsScreen storySettingsScreen;
+
+    private StorySettings storySettings;
 
     private CustomEntity customMainEntity;
     private CustomEntity customSupportingEntity;
@@ -64,6 +69,9 @@ public class MainPanel extends GameScreen {
         Gdx.graphics.setContinuousRendering(false);
 
         Localization.getInstance().setLocale(Locale.getDefault());
+
+        this.storySettings = new StorySettings();
+        this.storySettings.load();
 
         FileHandle dirHandle = Gdx.files.local(Prompt.DIRECTORY);
 
@@ -102,6 +110,11 @@ public class MainPanel extends GameScreen {
         if (this.customEntityEditor == null) {
             this.customEntityEditor = new CustomEntityEditor(this);
         }
+        if (this.storySettingsScreen == null) {
+            this.storySettingsScreen = new StorySettingsScreen(this);
+        }
+
+        this.getPromptObject().updateFromSettings(this.storySettings);
 
         this.createStory.init();
         this.listenStory.init();
@@ -163,6 +176,14 @@ public class MainPanel extends GameScreen {
     public void changeToCustomEntityEditor(CustomEntity customEntity) {
         this.customEntityEditor.setCustomEntity(customEntity);
         this.changeModel(this.customEntityEditor);
+    }
+
+    public void changeToStorySettings() {
+        this.changeModel(this.storySettingsScreen);
+    }
+
+    public StorySettings getStorySettings() {
+        return this.storySettings;
     }
 
     public void reInit() {
