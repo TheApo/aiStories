@@ -3,7 +3,10 @@ package com.apogames.aistories.game.createStory;
 import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
 import com.apogames.aistories.game.main.ChatGPTIO;
+import com.apogames.aistories.game.main.SongPrompt;
+import com.apogames.aistories.game.main.SunoApiIO;
 import com.apogames.aistories.game.objects.*;
+import com.apogames.aistories.game.settings.SongSettings;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
@@ -44,22 +47,29 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         getMainPanel().getButtonByFunction(FUNCTION_NEWPROMPT).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_SETTINGS).setVisible(true);
 
-        boolean hasOpenAI = ChatGPTIO.API_KEY != null && !ChatGPTIO.API_KEY.isEmpty() && !ChatGPTIO.API_KEY.equals("Dein ChatGPT API Key");
-        boolean hasGemini = ChatGPTIO.GEMINI_API_KEY != null && !ChatGPTIO.GEMINI_API_KEY.isEmpty() && !ChatGPTIO.GEMINI_API_KEY.equals("Dein Gemini API Key");
-        ApoButtonSwitch llmButton = (ApoButtonSwitch) getMainPanel().getButtonByFunction(FUNCTION_LLM);
-        if (!hasOpenAI && !hasGemini) {
-            getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setVisible(false);
-            llmButton.setVisible(false);
-        } else if (hasOpenAI && hasGemini) {
-            llmButton.setLabels("GPT-5-mini", "Gemini-3");
-            llmButton.setSelect(this.getMainPanel().getChatGPT().getLlm().startsWith("gemini"));
+        if (getMainPanel().isSongMode()) {
+            // Song mode: hide LLM switch, change generate button text
+            getMainPanel().getButtonByFunction(FUNCTION_LLM).setVisible(false);
+            getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setId("button_generate_song");
         } else {
-            if (hasGemini) {
-                this.getMainPanel().getChatGPT().setLlm(ChatGPTIO.LLM_MODEL_GEMINI);
-                llmButton.setSingleLabel("Gemini-3");
+            getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setId("button_start");
+            boolean hasOpenAI = ChatGPTIO.API_KEY != null && !ChatGPTIO.API_KEY.isEmpty() && !ChatGPTIO.API_KEY.equals("Dein ChatGPT API Key");
+            boolean hasGemini = ChatGPTIO.GEMINI_API_KEY != null && !ChatGPTIO.GEMINI_API_KEY.isEmpty() && !ChatGPTIO.GEMINI_API_KEY.equals("Dein Gemini API Key");
+            ApoButtonSwitch llmButton = (ApoButtonSwitch) getMainPanel().getButtonByFunction(FUNCTION_LLM);
+            if (!hasOpenAI && !hasGemini) {
+                getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setVisible(false);
+                llmButton.setVisible(false);
+            } else if (hasOpenAI && hasGemini) {
+                llmButton.setLabels("GPT-5-mini", "Gemini-3");
+                llmButton.setSelect(this.getMainPanel().getChatGPT().getLlm().startsWith("gemini"));
             } else {
-                this.getMainPanel().getChatGPT().setLlm(ChatGPTIO.LLM_MODEL_MINI);
-                llmButton.setSingleLabel("GPT-5-mini");
+                if (hasGemini) {
+                    this.getMainPanel().getChatGPT().setLlm(ChatGPTIO.LLM_MODEL_GEMINI);
+                    llmButton.setSingleLabel("Gemini-3");
+                } else {
+                    this.getMainPanel().getChatGPT().setLlm(ChatGPTIO.LLM_MODEL_MINI);
+                    llmButton.setSingleLabel("GPT-5-mini");
+                }
             }
         }
 
@@ -176,14 +186,22 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
                 }
                 break;
             case CreateStory.FUNCTION_GENERATE_TEXT:
-                start();
-                getMainPanel().changeToListenStories(true);
+                if (getMainPanel().isSongMode()) {
+                    startSong();
+                } else {
+                    start();
+                    getMainPanel().changeToListenStories(true);
+                }
                 break;
             case CreateStory.FUNCTION_NEWPROMPT:
                 shufflePrompt();
                 break;
             case CreateStory.FUNCTION_SETTINGS:
-                getMainPanel().changeToStorySettings();
+                if (getMainPanel().isSongMode()) {
+                    getMainPanel().changeToSongSettings();
+                } else {
+                    getMainPanel().changeToStorySettings();
+                }
                 break;
         }
     }
@@ -203,13 +221,44 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         this.objectSelection.get(4).setGameObjective(main.getPromptObject().getGameObjectives().getObjectives());
     }
 
+    private void applySelectedObjectives() {
+        GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
+        go.setMainCharacter(this.objectSelection.get(0).isEnabled() ? this.objectSelection.get(0).getGameObjective() : null);
+        go.setSupportingCharacter(this.objectSelection.get(1).isEnabled() ? this.objectSelection.get(1).getGameObjective() : null);
+        go.setUniverse(this.objectSelection.get(2).isEnabled() ? this.objectSelection.get(2).getGameObjective() : null);
+        go.setPlaces(this.objectSelection.get(3).isEnabled() ? this.objectSelection.get(3).getGameObjective() : null);
+        go.setObjectives(this.objectSelection.get(4).isEnabled() ? this.objectSelection.get(4).getGameObjective() : null);
+    }
+
+    private void startSong() {
+        Gdx.app.log("create Song", "create Song begin");
+        applySelectedObjectives();
+
+        GameObjectives go = getMainPanel().getPromptObject().getGameObjectives();
+        SongSettings songSettings = getMainPanel().getSongSettings();
+
+        String sunoPrompt = SongPrompt.buildSunoPrompt(songSettings, go);
+
+        this.getMainPanel().getTextArea().setText(sunoPrompt);
+
+        SunoApiIO sunoApi = new SunoApiIO(getMainPanel().getListenStory());
+        String header = (go.getMainCharacter() != null ? go.getMainCharacter().getName() : "") + ";"
+                + (go.getSupportingCharacter() != null ? go.getSupportingCharacter().getName() : "") + ";"
+                + (go.getUniverse() != null ? go.getUniverse().getName() : "") + ";"
+                + (go.getPlaces() != null ? go.getPlaces().getName() : "") + ";"
+                + (go.getObjectives() != null ? go.getObjectives().getName() : "");
+        sunoApi.setCharacterHeader(header);
+
+        getMainPanel().changeToListenStoriesForSong();
+
+        Gdx.app.log("SunoPrompt", "Length: " + sunoPrompt.length() + " chars");
+        sunoApi.generateSong(sunoPrompt);
+        Gdx.app.log("create Song", "create Song end");
+    }
+
     private void start() {
         Gdx.app.log("create Story", "create Story begin");
-        this.getMainPanel().getPromptObject().getGameObjectives().setMainCharacter(this.objectSelection.get(0).getGameObjective());
-        this.getMainPanel().getPromptObject().getGameObjectives().setSupportingCharacter(this.objectSelection.get(1).getGameObjective());
-        this.getMainPanel().getPromptObject().getGameObjectives().setUniverse(this.objectSelection.get(2).getGameObjective());
-        this.getMainPanel().getPromptObject().getGameObjectives().setPlaces(this.objectSelection.get(3).getGameObjective());
-        this.getMainPanel().getPromptObject().getGameObjectives().setObjectives(this.objectSelection.get(4).getGameObjective());
+        applySelectedObjectives();
         this.getMainPanel().getPromptObject().setUpPrompt();
         this.getMainPanel().getTextArea().setText(this.getMainPanel().getPromptObject().getPrompt());
         this.getMainPanel().getChatGPT().reset();
@@ -219,6 +268,7 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
     @Override
     protected void quit() {
+        getMainPanel().setSongMode(false);
         getMainPanel().changeToMenu();
     }
 
@@ -249,7 +299,8 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         }
         getMainPanel().getRenderer().end();
 
-        getMainPanel().drawTitle(Localization.getInstance().getCommon().get("title"), Constants.COLOR_WHITE, false);
+        String titleKey = getMainPanel().isSongMode() ? "song_title" : "create_story_title";
+        getMainPanel().drawTitle(Localization.getInstance().getCommon().get(titleKey), Constants.COLOR_WHITE, false);
 
         for (ObjectSelection selection : this.objectSelection) {
             selection.renderSprite(getMainPanel(), 0, 0);

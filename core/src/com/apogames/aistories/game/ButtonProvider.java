@@ -33,6 +33,7 @@ import com.apogames.aistories.game.creativeTonie.CreativeTonie;
 import com.apogames.aistories.game.customEntity.CustomEntityEditor;
 import com.apogames.aistories.game.listenStories.ListenStories;
 import com.apogames.aistories.game.menu.Menu;
+import com.apogames.aistories.game.settings.SongSettingsScreen;
 import com.apogames.aistories.game.settings.StorySettingsScreen;
 import com.apogames.asset.AssetLoader;
 import com.apogames.entity.*;
@@ -118,7 +119,7 @@ public class ButtonProvider {
             function = CreateStory.FUNCTION_LLM;
             width = 70;
             height = 36;
-            x = Constants.GAME_WIDTH - width - 250;
+            x = Constants.GAME_WIDTH - width - 160;
             y = 17;
             button = new ApoButtonSwitch(x, y, width, height, function, Constants.COLOR_WHITE, Constants.COLOR_BLACK);
             ((ApoButtonSwitch) button).setLabels("GPT-5-mini", "Gemini-3");
@@ -130,8 +131,18 @@ public class ButtonProvider {
             width = 600;
             height = 150;
             x = Constants.GAME_WIDTH/2 - width/2;
-            y = 150;
+            y = 120;
             button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "button_createstory");
+            button.setFont(AssetLoader.font30);
+            this.game.getButtons().add(button);
+
+            text = "TONIE";
+            function = Menu.FUNCTION_CREATESONG;
+            width = 600;
+            height = 150;
+            x = Constants.GAME_WIDTH/2 - width/2;
+            y = 300;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "button_createsong");
             button.setFont(AssetLoader.font30);
             this.game.getButtons().add(button);
 
@@ -140,7 +151,7 @@ public class ButtonProvider {
             width = 600;
             height = 150;
             x = Constants.GAME_WIDTH/2 - width/2;
-            y = 450;
+            y = 480;
             button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "button_allmp3s");
             button.setFont(AssetLoader.font30);
             this.game.getButtons().add(button);
@@ -259,6 +270,17 @@ public class ButtonProvider {
             y = 20;
             button = new ApoButtonImageThreeExtra(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "");
             ((ApoButtonImageThreeExtra)(button)).setExtra(ApoButtonImageThreeExtra.EXTRA.PREV);
+            this.game.getButtons().add(button);
+
+            // Song variant switch button — positioned right of audio bar
+            text = "V1/2";
+            function = ListenStories.FUNCTION_SONG_VARIANT;
+            width = 120;
+            height = 64;
+            x = 990;
+            y = 700 + (70 - height) / 2;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "");
+            button.setFont(AssetLoader.font25);
             this.game.getButtons().add(button);
 
             // Tonie upload button - below book
@@ -380,6 +402,28 @@ public class ButtonProvider {
             button = new ApoButtonSwitch(x, y, width, height, function, Constants.COLOR_WHITE, Constants.COLOR_BLACK);
             ((ApoButtonSwitch) button).setLabels("GPT-5-mini", "Gemini-3");
             button.setFont(AssetLoader.font20);
+            this.game.getButtons().add(button);
+
+            // SongSettingsScreen buttons
+            text = "";
+            function = SongSettingsScreen.FUNCTION_BACK;
+            width = 64;
+            height = 64;
+            x = Constants.GAME_WIDTH - width - 15;
+            y = Constants.GAME_HEIGHT - height - 5;
+            button = new ApoButtonImageWithThree(x, y, width, height, function, text, AssetLoader.buttonXTextureRegion);
+            button.setStroke(1);
+            button.setFont(AssetLoader.font40);
+            this.game.getButtons().add(button);
+
+            text = "Save";
+            function = SongSettingsScreen.FUNCTION_CONFIRM;
+            width = 450;
+            height = 64;
+            x = Constants.GAME_WIDTH / 2 - width / 2;
+            y = Constants.GAME_HEIGHT - 90;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "song_settings_confirm");
+            button.setFont(AssetLoader.font25);
             this.game.getButtons().add(button);
 
             // StorySettingsScreen buttons

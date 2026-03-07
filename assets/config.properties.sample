@@ -5,3 +5,4 @@ ELEVENLABS_VOICE_ID=Deine ELEVENLABS_Voice ID wie z.B. YeeVW65klONqeKOpqQQo
 ELEVENLABS_MODEL_ID=eleven_multilingual_v2
 TONIES_USERNAME=Dein Username zur Anmeldung in der Tonies Cloud
 TONIES_PASSWORD=Dein Passwort zur Anemdlung in der Tonies Cloud
+SUNO_API_KEY=Dein SunoAPI API Key

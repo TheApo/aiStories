@@ -140,18 +140,31 @@ public class Prompt {
     }
 
     private String buildCharacterBlock() {
-        return "Die Geschichte beinhaltet folgende Elemente:\n" +
-                "Hauptcharakter: " + gameObjectives.getMainCharacter().getDisplayName() + ", \n" +
-                "Nebencharakter: " + gameObjectives.getSupportingCharacter().getDisplayName() + ", \n" +
-                "Spielort: " + gameObjectives.getPlaces().getDisplayName() + ", \n" +
-                "Universum: " + gameObjectives.getUniverse().getDisplayName() + ", \n" +
-                "Ein zentrales magisches oder wichtiges Objekt: " + gameObjectives.getObjectives().getDisplayName() + ".\n\n" +
-                "Die Geschichte kann (muss aber nicht komplett) folgende Fragen beantworten:\n" +
-                "- Was macht den Hauptcharakter besonders? " + gameObjectives.getMainCharacter().getDisplayDetails() + "\n" +
-                "- Welche lustigen oder aussergewoehnlichen Eigenschaften hat der Nebencharakter? " + gameObjectives.getSupportingCharacter().getDisplayDetails() + "\n" +
-                "- Welche geheimnisvollen oder magischen Elemente gibt es im Universum? " + gameObjectives.getUniverse().getDisplayDetails() + "\n" +
-                "- Welche Herausforderungen oder Ueberraschungen gibt es am Ort der Handlung? " + gameObjectives.getPlaces().getDisplayDetails() + "\n" +
-                "- Welche besondere Bedeutung hat das Objekt und wie beeinflusst es die Handlung? " + gameObjectives.getObjectives().getDisplayDetails();
+        StringBuilder elements = new StringBuilder("Die Geschichte beinhaltet folgende Elemente:\n");
+        StringBuilder questions = new StringBuilder("Die Geschichte kann (muss aber nicht komplett) folgende Fragen beantworten:\n");
+
+        if (gameObjectives.getMainCharacter() != null) {
+            elements.append("Hauptcharakter: ").append(gameObjectives.getMainCharacter().getDisplayName()).append(", \n");
+            questions.append("- Was macht den Hauptcharakter besonders? ").append(gameObjectives.getMainCharacter().getDisplayDetails()).append("\n");
+        }
+        if (gameObjectives.getSupportingCharacter() != null) {
+            elements.append("Nebencharakter: ").append(gameObjectives.getSupportingCharacter().getDisplayName()).append(", \n");
+            questions.append("- Welche lustigen oder aussergewoehnlichen Eigenschaften hat der Nebencharakter? ").append(gameObjectives.getSupportingCharacter().getDisplayDetails()).append("\n");
+        }
+        if (gameObjectives.getUniverse() != null) {
+            elements.append("Universum: ").append(gameObjectives.getUniverse().getDisplayName()).append(", \n");
+            questions.append("- Welche geheimnisvollen oder magischen Elemente gibt es im Universum? ").append(gameObjectives.getUniverse().getDisplayDetails()).append("\n");
+        }
+        if (gameObjectives.getPlaces() != null) {
+            elements.append("Spielort: ").append(gameObjectives.getPlaces().getDisplayName()).append(", \n");
+            questions.append("- Welche Herausforderungen oder Ueberraschungen gibt es am Ort der Handlung? ").append(gameObjectives.getPlaces().getDisplayDetails()).append("\n");
+        }
+        if (gameObjectives.getObjectives() != null) {
+            elements.append("Ein zentrales magisches oder wichtiges Objekt: ").append(gameObjectives.getObjectives().getDisplayName()).append(".\n");
+            questions.append("- Welche besondere Bedeutung hat das Objekt und wie beeinflusst es die Handlung? ").append(gameObjectives.getObjectives().getDisplayDetails());
+        }
+
+        return elements.toString() + "\n" + questions.toString();
     }
 
     private void addLanguageInstruction() {
@@ -173,7 +186,16 @@ public class Prompt {
         DateTimeFormatter myFormatObj = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_");
         String formattedDate = currentDateTime.format(myFormatObj);
 
-        this.fileNameMP3 = formattedDate + gameObjectives.getMainCharacter().getDisplayName() + "_" + gameObjectives.getSupportingCharacter().getDisplayName() + "_" + gameObjectives.getUniverse().getDisplayName() + ".mp3";
-        this.fileNameTxt = formattedDate + gameObjectives.getMainCharacter().getDisplayName() + "_" + gameObjectives.getSupportingCharacter().getDisplayName() + "_" + gameObjectives.getUniverse().getDisplayName() + ".txt";
+        String main = gameObjectives.getMainCharacter() != null ? gameObjectives.getMainCharacter().getDisplayName() : "";
+        String support = gameObjectives.getSupportingCharacter() != null ? gameObjectives.getSupportingCharacter().getDisplayName() : "";
+        String universe = gameObjectives.getUniverse() != null ? gameObjectives.getUniverse().getDisplayName() : "";
+
+        String namePart = main;
+        if (!support.isEmpty()) namePart += "_" + support;
+        if (!universe.isEmpty()) namePart += "_" + universe;
+        if (namePart.isEmpty()) namePart = "Story";
+
+        this.fileNameMP3 = formattedDate + namePart + ".mp3";
+        this.fileNameTxt = formattedDate + namePart + ".txt";
     }
 }

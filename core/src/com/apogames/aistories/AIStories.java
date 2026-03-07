@@ -3,6 +3,7 @@ package com.apogames.aistories;
 import com.apogames.aistories.game.MainPanel;
 import com.apogames.aistories.game.main.ChatGPTIO;
 import com.apogames.aistories.game.main.ElvenlabIO;
+import com.apogames.aistories.game.main.SunoApiIO;
 import com.apogames.aistories.game.main.ToniesAPI;
 import com.apogames.aistories.game.objects.*;
 import com.apogames.asset.AssetLoader;
@@ -43,6 +44,7 @@ public class AIStories extends Game {
             }
             ToniesAPI.USERNAME = props.getProperty("TONIES_USERNAME");
             ToniesAPI.PASSWORD = props.getProperty("TONIES_PASSWORD");
+            SunoApiIO.API_KEY = props.getProperty("SUNO_API_KEY");
         } catch (Exception ex) {
             System.out.println("Error loading config.properties: " + ex.getMessage());
         }

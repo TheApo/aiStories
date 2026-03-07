@@ -21,7 +21,10 @@
       "WebFetch(domain:cookbook.openai.com)",
       "WebFetch(domain:blog.laozhang.ai)",
       "WebFetch(domain:developers.openai.com)",
-      "WebFetch(domain:yingtu.ai)"
+      "WebFetch(domain:yingtu.ai)",
+      "WebFetch(domain:docs.sunoapi.org)",
+      "Bash(node:*)",
+      "Bash(./gradlew :desktop:compileJava:*)"
     ]
   }
 }

@@ -2,6 +2,7 @@ package com.apogames.aistories.game.settings;
 
 import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
+import com.apogames.aistories.game.main.SongPrompt;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
@@ -9,16 +10,15 @@ import com.apogames.common.Localization;
 import com.apogames.entity.ApoButton;
 import com.apogames.entity.Textfield;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 
-public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
+public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
 
-    public static final String FUNCTION_BACK = "SETTINGS_QUIT";
-    public static final String FUNCTION_CONFIRM = "SETTINGS_CONFIRM";
+    public static final String FUNCTION_BACK = "SONGSETTINGS_QUIT";
+    public static final String FUNCTION_CONFIRM = "SONGSETTINGS_CONFIRM";
 
     private static final int TILE_HEIGHT = 45;
     private static final int TILE_GAP = 8;
@@ -29,7 +29,7 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
     private static final int SECTION_GAP = 7;
 
     private static final int SECTION_1_Y = 78;
-    private static final int ROW_Y_TYPE = SECTION_1_Y + 28;
+    private static final int ROW_Y_STYLE = SECTION_1_Y + 28;
     private static final int SECTION_1_H = 28 + TILE_HEIGHT + 8;
 
     private static final int SECTION_2_Y = SECTION_1_Y + SECTION_1_H + SECTION_GAP;
@@ -51,26 +51,26 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
 
     private final boolean[] keys = new boolean[256];
     private Textfield promptField;
-    private int hoverType = -1;
+    private int hoverStyle = -1;
     private int hoverAge = -1;
     private int hoverLength = -1;
 
-    private StorySettings.StoryType selectedType;
+    private SongSettings.MusicStyle selectedStyle;
     private StorySettings.AgeGroup selectedAge;
-    private StorySettings.StoryLength selectedLength;
+    private SongSettings.SongLength selectedLength;
 
     private static final GlyphLayout glyphLayout = new GlyphLayout();
 
-    public StorySettingsScreen(MainPanel game) {
+    public SongSettingsScreen(MainPanel game) {
         super(game);
     }
 
     @Override
     public void init() {
-        StorySettings settings = getMainPanel().getStorySettings();
-        this.selectedType = settings.getStoryType();
+        SongSettings settings = getMainPanel().getSongSettings();
+        this.selectedStyle = settings.getMusicStyle();
         this.selectedAge = settings.getAgeGroup();
-        this.selectedLength = settings.getStoryLength();
+        this.selectedLength = settings.getSongLength();
 
         if (this.promptField == null) {
             this.promptField = new Textfield(PROMPT_X, PROMPT_Y, PROMPT_WIDTH, PROMPT_HEIGHT, AssetLoader.font25);
@@ -83,7 +83,7 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
 
         String template = settings.getPromptTemplate();
         if (template == null || template.isEmpty()) {
-            template = getMainPanel().getPromptObject().buildPromptTemplate(settings);
+            template = SongPrompt.buildPromptTemplate(settings);
         }
         this.promptField.setCurString(template);
         this.promptField.setSelect(false);
@@ -103,39 +103,30 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
         super.mouseButtonFunction(function);
         switch (function) {
             case FUNCTION_BACK:
-                goBack();
+                getMainPanel().changeToCreateSong();
                 break;
             case FUNCTION_CONFIRM:
                 applyAndSave();
-                goBack();
+                getMainPanel().changeToCreateSong();
                 break;
-        }
-    }
-
-    private void goBack() {
-        if (getMainPanel().isSongMode()) {
-            getMainPanel().changeToCreateSong();
-        } else {
-            getMainPanel().changeToCreateStory();
         }
     }
 
     private void applyAndSave() {
-        StorySettings settings = getMainPanel().getStorySettings();
-        settings.setStoryType(selectedType);
+        SongSettings settings = getMainPanel().getSongSettings();
+        settings.setMusicStyle(selectedStyle);
         settings.setAgeGroup(selectedAge);
-        settings.setStoryLength(selectedLength);
+        settings.setSongLength(selectedLength);
         settings.setPromptTemplate(promptField.getCurString());
         settings.save();
-        getMainPanel().getPromptObject().updateFromSettings(settings);
     }
 
     private void regenerateTemplate() {
-        StorySettings tempSettings = new StorySettings();
-        tempSettings.setStoryType(selectedType);
+        SongSettings tempSettings = new SongSettings();
+        tempSettings.setMusicStyle(selectedStyle);
         tempSettings.setAgeGroup(selectedAge);
-        tempSettings.setStoryLength(selectedLength);
-        String template = getMainPanel().getPromptObject().buildPromptTemplate(tempSettings);
+        tempSettings.setSongLength(selectedLength);
+        String template = SongPrompt.buildPromptTemplate(tempSettings);
         promptField.setCurString(template);
     }
 
@@ -147,9 +138,9 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
         }
         promptField.setSelect(false);
 
-        int typeIndex = getTileIndex(x, y, ROW_Y_TYPE, StorySettings.StoryType.values().length, getTypeTileWidth());
-        if (typeIndex >= 0) {
-            selectedType = StorySettings.StoryType.values()[typeIndex];
+        int styleIndex = getTileIndex(x, y, ROW_Y_STYLE, SongSettings.MusicStyle.values().length, getStyleTileWidth());
+        if (styleIndex >= 0) {
+            selectedStyle = SongSettings.MusicStyle.values()[styleIndex];
             regenerateTemplate();
             return;
         }
@@ -159,9 +150,9 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
             regenerateTemplate();
             return;
         }
-        int lengthIndex = getTileIndex(x, y, ROW_Y_LENGTH, StorySettings.StoryLength.values().length, getLengthTileWidth());
+        int lengthIndex = getTileIndex(x, y, ROW_Y_LENGTH, SongSettings.SongLength.values().length, getLengthTileWidth());
         if (lengthIndex >= 0) {
-            selectedLength = StorySettings.StoryLength.values()[lengthIndex];
+            selectedLength = SongSettings.SongLength.values()[lengthIndex];
             regenerateTemplate();
         }
     }
@@ -179,9 +170,9 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
     @Override
     public void mouseMoved(int x, int y) {
         promptField.getMove(x, y);
-        hoverType = getTileIndex(x, y, ROW_Y_TYPE, StorySettings.StoryType.values().length, getTypeTileWidth());
+        hoverStyle = getTileIndex(x, y, ROW_Y_STYLE, SongSettings.MusicStyle.values().length, getStyleTileWidth());
         hoverAge = getTileIndex(x, y, ROW_Y_AGE, StorySettings.AgeGroup.values().length, getAgeTileWidth());
-        hoverLength = getTileIndex(x, y, ROW_Y_LENGTH, StorySettings.StoryLength.values().length, getLengthTileWidth());
+        hoverLength = getTileIndex(x, y, ROW_Y_LENGTH, SongSettings.SongLength.values().length, getLengthTileWidth());
     }
 
     @Override
@@ -218,9 +209,9 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
         return -1;
     }
 
-    private int getTypeTileWidth() {
-        return (Constants.GAME_WIDTH - 2 * TILES_X - (StorySettings.StoryType.values().length - 1) * TILE_GAP)
-                / StorySettings.StoryType.values().length;
+    private int getStyleTileWidth() {
+        return (Constants.GAME_WIDTH - 2 * TILES_X - (SongSettings.MusicStyle.values().length - 1) * TILE_GAP)
+                / SongSettings.MusicStyle.values().length;
     }
 
     private int getAgeTileWidth() {
@@ -229,13 +220,13 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
     }
 
     private int getLengthTileWidth() {
-        return (Constants.GAME_WIDTH - 2 * TILES_X - (StorySettings.StoryLength.values().length - 1) * TILE_GAP)
-                / StorySettings.StoryLength.values().length;
+        return (Constants.GAME_WIDTH - 2 * TILES_X - (SongSettings.SongLength.values().length - 1) * TILE_GAP)
+                / SongSettings.SongLength.values().length;
     }
 
     @Override
     protected void quit() {
-        goBack();
+        getMainPanel().changeToCreateSong();
     }
 
     @Override
@@ -251,7 +242,6 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
 
         Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
 
-        // Section background panels
         getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
         getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.4f);
         getMainPanel().getRenderer().roundedRect(SECTION_X, SECTION_1_Y, SECTION_W, SECTION_1_H, 10);
@@ -260,25 +250,25 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
         getMainPanel().getRenderer().roundedRect(SECTION_X, SECTION_4_Y, SECTION_W, SECTION_4_H, 10);
         getMainPanel().getRenderer().end();
 
-        renderTileRow(ROW_Y_TYPE, StorySettings.StoryType.values().length, getTypeTileWidth(),
-                selectedType.ordinal(), hoverType);
+        renderTileRow(ROW_Y_STYLE, SongSettings.MusicStyle.values().length, getStyleTileWidth(),
+                selectedStyle.ordinal(), hoverStyle);
         renderTileRow(ROW_Y_AGE, StorySettings.AgeGroup.values().length, getAgeTileWidth(),
                 selectedAge.ordinal(), hoverAge);
-        renderTileRow(ROW_Y_LENGTH, StorySettings.StoryLength.values().length, getLengthTileWidth(),
+        renderTileRow(ROW_Y_LENGTH, SongSettings.SongLength.values().length, getLengthTileWidth(),
                 selectedLength.ordinal(), hoverLength);
 
         Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
 
-        getMainPanel().drawTitle(Localization.getInstance().getCommon().get("settings_title"), Constants.COLOR_WHITE, false);
+        getMainPanel().drawTitle(Localization.getInstance().getCommon().get("song_settings_title"), Constants.COLOR_WHITE, false);
 
-        drawLabel(Localization.getInstance().getCommon().get("settings_story_type"), SECTION_1_Y + 3);
-        drawTileLabels(ROW_Y_TYPE, StorySettings.StoryType.values().length, getTypeTileWidth(), getTypeLabels(), selectedType.ordinal());
+        drawLabel(Localization.getInstance().getCommon().get("song_music_style"), SECTION_1_Y + 3);
+        drawTileLabels(ROW_Y_STYLE, SongSettings.MusicStyle.values().length, getStyleTileWidth(), getStyleLabels(), selectedStyle.ordinal());
 
         drawLabel(Localization.getInstance().getCommon().get("settings_age_group"), SECTION_2_Y + 3);
         drawTileLabels(ROW_Y_AGE, StorySettings.AgeGroup.values().length, getAgeTileWidth(), getAgeLabels(), selectedAge.ordinal());
 
-        drawLabel(Localization.getInstance().getCommon().get("settings_length"), SECTION_3_Y + 3);
-        drawTileLabels(ROW_Y_LENGTH, StorySettings.StoryLength.values().length, getLengthTileWidth(), getLengthLabels(), selectedLength.ordinal());
+        drawLabel(Localization.getInstance().getCommon().get("song_length"), SECTION_3_Y + 3);
+        drawTileLabels(ROW_Y_LENGTH, SongSettings.SongLength.values().length, getLengthTileWidth(), getLengthLabels(), selectedLength.ordinal());
 
         drawLabel(Localization.getInstance().getCommon().get("settings_prompt"), SECTION_4_Y + 3);
 
@@ -330,10 +320,11 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
         }
     }
 
-    private String[] getTypeLabels() {
-        StorySettings.StoryType[] values = StorySettings.StoryType.values();
+    private String[] getStyleLabels() {
+        SongSettings.MusicStyle[] values = SongSettings.MusicStyle.values();
         String[] labels = new String[values.length];
-        String[] keys = {"story_type_bedtime", "story_type_friendship", "story_type_detective", "story_type_adventure", "story_type_fairytale"};
+        String[] keys = {"music_pop", "music_rock", "music_country", "music_hiphop",
+                "music_lullaby", "music_folk", "music_electronic", "music_musical"};
         for (int i = 0; i < values.length; i++) {
             labels[i] = Localization.getInstance().getCommon().get(keys[i]);
         }
@@ -351,9 +342,9 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
     }
 
     private String[] getLengthLabels() {
-        StorySettings.StoryLength[] values = StorySettings.StoryLength.values();
+        SongSettings.SongLength[] values = SongSettings.SongLength.values();
         String[] labels = new String[values.length];
-        String[] keys = {"length_short", "length_medium", "length_long"};
+        String[] keys = {"song_length_short", "song_length_medium", "song_length_long"};
         for (int i = 0; i < values.length; i++) {
             labels[i] = Localization.getInstance().getCommon().get(keys[i]);
         }

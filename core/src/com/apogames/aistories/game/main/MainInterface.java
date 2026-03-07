@@ -8,6 +8,8 @@ public interface MainInterface {
 
     void setRunning(Running running);
 
+    void setStatusText(String statusText);
+
     void setTextForTextArea(String text);
 
     void uploadToTonieBox(FileHandle fileHandle);

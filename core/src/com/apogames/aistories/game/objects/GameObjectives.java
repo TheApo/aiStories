@@ -42,10 +42,10 @@ public class GameObjectives {
     }
 
     public void refresh() {
-        this.mainCharacter.refresh();
-        this.supportingCharacter.refresh();
-        this.objectives.refresh();
-        this.places.refresh();
-        this.universe.refresh();
+        if (this.mainCharacter != null) this.mainCharacter.refresh();
+        if (this.supportingCharacter != null) this.supportingCharacter.refresh();
+        if (this.objectives != null) this.objectives.refresh();
+        if (this.places != null) this.places.refresh();
+        if (this.universe != null) this.universe.refresh();
     }
 }

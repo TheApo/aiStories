@@ -43,6 +43,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     public static final String FUNCTION_PREVIOUS_STORY = "LISTEN_PREVIOUS_STORY";
     public static final String FUNCTION_UPLOAD_TONIE = "LISTEN_UPLOAD_TONIE";
     public static final String FUNCTION_DELETE = "LISTEN_DELETE";
+    public static final String FUNCTION_SONG_VARIANT = "LISTEN_SONG_VARIANT";
 
     private final boolean[] keys = new boolean[256];
 
@@ -64,6 +65,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private WordHighlighter highlighter = null;
     private ArrayList<Integer> choosenImageStory = new ArrayList<>();
     private int choosenReadStory = -1;
+    private boolean isSong = false;
+    private int songVariantIndex = 0;
+    private FileHandle[] songVariantHandles;
 
     private FontSize fontSize = FontSize.FONT_25;
 
@@ -92,6 +96,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private String nextText = null;
     private Running nextRunning;
+    private String nextStatusText = null;
+    private String statusText = "";
     private boolean reload = false;
 
     public ListenStories(final MainPanel game) {
@@ -110,6 +116,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_STORY).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_UPLOAD_TONIE).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_DELETE).setVisible(true);
+        getMainPanel().getButtonByFunction(FUNCTION_SONG_VARIANT).setVisible(false);
 
         this.setVisibleFalseWhenNotSet();
     }
@@ -170,6 +177,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 this.choosenReadStory = chooseStory;
             }
         }
+        // Detect song from filename before findListenStory
+        this.isSong = false;
+        if (this.choosenReadStory >= 0) {
+            String fileName = this.fileTXTHandles[this.choosenReadStory].file().getName();
+            this.isSong = fileName.endsWith("_song.txt");
+        }
         findListenStory();
 
         // Create/update TextArea with correct height
@@ -189,17 +202,33 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private void setTextInTextArea(String text) {
+        this.isSong = false;
         if (text.contains(SEPARATOR_IN_FILE)) {
             String values = text.substring(0,text.indexOf(SEPARATOR_IN_FILE));
-            String[] split = values.split(";");
 
-            GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
-            go.setMainCharacter(resolveEntity(split[0], go.getMainCharacter(), this.getMainPanel().getCustomMainEntity()));
-            go.setSupportingCharacter(resolveEntity(split[1], go.getSupportingCharacter(), this.getMainPanel().getCustomSupportingEntity()));
-            go.setUniverse(resolveEntity(split[2], go.getUniverse(), this.getMainPanel().getCustomUniverse()));
-            go.setPlaces(resolveEntity(split[3], go.getPlaces(), this.getMainPanel().getCustomPlaces()));
-            go.setObjectives(resolveEntity(split[4], go.getObjectives(), this.getMainPanel().getCustomObjectives()));
-            text = text.substring(text.indexOf(SEPARATOR_IN_FILE) + SEPARATOR_IN_FILE.length());
+            if (values.startsWith("song")) {
+                this.isSong = true;
+                String[] songParts = values.split(";");
+                if (songParts.length >= 6) {
+                    GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
+                    go.setMainCharacter(resolveEntity(songParts[1], go.getMainCharacter(), this.getMainPanel().getCustomMainEntity()));
+                    go.setSupportingCharacter(resolveEntity(songParts[2], go.getSupportingCharacter(), this.getMainPanel().getCustomSupportingEntity()));
+                    go.setUniverse(resolveEntity(songParts[3], go.getUniverse(), this.getMainPanel().getCustomUniverse()));
+                    go.setPlaces(resolveEntity(songParts[4], go.getPlaces(), this.getMainPanel().getCustomPlaces()));
+                    go.setObjectives(resolveEntity(songParts[5], go.getObjectives(), this.getMainPanel().getCustomObjectives()));
+                }
+                text = text.substring(text.indexOf(SEPARATOR_IN_FILE) + SEPARATOR_IN_FILE.length());
+            } else {
+                String[] split = values.split(";");
+
+                GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
+                go.setMainCharacter(resolveEntity(split[0], go.getMainCharacter(), this.getMainPanel().getCustomMainEntity()));
+                go.setSupportingCharacter(resolveEntity(split[1], go.getSupportingCharacter(), this.getMainPanel().getCustomSupportingEntity()));
+                go.setUniverse(resolveEntity(split[2], go.getUniverse(), this.getMainPanel().getCustomUniverse()));
+                go.setPlaces(resolveEntity(split[3], go.getPlaces(), this.getMainPanel().getCustomPlaces()));
+                go.setObjectives(resolveEntity(split[4], go.getObjectives(), this.getMainPanel().getCustomObjectives()));
+                text = text.substring(text.indexOf(SEPARATOR_IN_FILE) + SEPARATOR_IN_FILE.length());
+            }
         }
         this.currentSpread = 0;
         this.pendingSpread = 0;
@@ -352,13 +381,14 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private boolean hasAudioCapability() {
         boolean hasMp3 = this.choosenListenStory >= 0;
+        boolean hasSongVariants = this.songVariantHandles != null && this.songVariantHandles.length > 0;
         boolean hasElevenLabs = ElvenlabIO.API_KEY != null && !ElvenlabIO.API_KEY.isEmpty()
                 && !ElvenlabIO.API_KEY.equals("Dein ELEVENLABS_API_KEY");
-        return hasMp3 || hasElevenLabs;
+        return hasMp3 || hasSongVariants || hasElevenLabs;
     }
 
     private void updateAudioButtonVisibility() {
-        boolean hasMp3 = this.choosenListenStory >= 0;
+        boolean hasMp3 = this.choosenListenStory >= 0 || (this.songVariantHandles != null && this.songVariantHandles.length > 0);
         if (!hasMp3) {
             getMainPanel().getButtonByFunction(FUNCTION_PLAY).setVisible(false);
             getMainPanel().getButtonByFunction(FUNCTION_PAUSE).setVisible(false);
@@ -400,6 +430,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().getButtonByFunction(FUNCTION_STOP).setY(audioY);
         getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setY(audioY);
 
+        // Song variant button: right of audio bar
+        getMainPanel().getButtonByFunction(FUNCTION_SONG_VARIANT).setY(audioY);
+
         // Hide audio row entirely if no audio capability
         if (!audioCapable) {
             getMainPanel().getButtonByFunction(FUNCTION_PLAY).setVisible(false);
@@ -422,14 +455,29 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private EnumInterface resolveEntity(String name, EnumInterface current, CustomEntity custom) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
         if (custom != null && custom.getName().equals(name)) {
             return custom;
         }
-        return current.getEnumByName(name);
+        if (current != null) {
+            return current.getEnumByName(name);
+        }
+        return null;
     }
 
     public void createNewStory() {
         this.running = Running.CREATE_STORY;
+        this.currentSpread = 0;
+        this.pendingSpread = 0;
+        fitPromptToTwoPages();
+        this.setButtonsInsivislbe();
+    }
+
+    public void createNewSong() {
+        this.running = Running.CREATE_SONG;
+        this.isSong = true;
         this.currentSpread = 0;
         this.pendingSpread = 0;
         fitPromptToTwoPages();
@@ -465,6 +513,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().getButtonByFunction(FUNCTION_NEXT_STORY).setVisible(false);
         getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_STORY).setVisible(false);
         getMainPanel().getButtonByFunction(FUNCTION_DELETE).setVisible(false);
+        getMainPanel().getButtonByFunction(FUNCTION_SONG_VARIANT).setVisible(false);
     }
 
     @Override
@@ -481,18 +530,29 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     @Override
+    public void setStatusText(String statusText) {
+        this.nextStatusText = statusText;
+        Gdx.graphics.requestRendering();
+    }
+
+    @Override
     public void setTextForTextArea(String text) {
         this.nextText = text;
         Gdx.graphics.requestRendering();
     }
 
+    private String safeGetName(EnumInterface e) {
+        return e != null ? e.getName() : "";
+    }
+
     private void saveText(String text) {
         String dirString = Prompt.DIRECTORY;
-        String ids = this.getMainPanel().getPromptObject().getGameObjectives().getMainCharacter().getName()+";"+
-                this.getMainPanel().getPromptObject().getGameObjectives().getSupportingCharacter().getName()+";"+
-                this.getMainPanel().getPromptObject().getGameObjectives().getUniverse().getName()+";"+
-                this.getMainPanel().getPromptObject().getGameObjectives().getPlaces().getName()+";"+
-                this.getMainPanel().getPromptObject().getGameObjectives().getObjectives().getName()+SEPARATOR_IN_FILE;
+        GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
+        String ids = safeGetName(go.getMainCharacter()) + ";"
+                + safeGetName(go.getSupportingCharacter()) + ";"
+                + safeGetName(go.getUniverse()) + ";"
+                + safeGetName(go.getPlaces()) + ";"
+                + safeGetName(go.getObjectives()) + SEPARATOR_IN_FILE;
         String fileName = dirString+this.prompt.getFileNameTxt();
         Gdx.app.log("SaveText", "saveText " + ids+" "+fileName);
         FileHandle fileHandle = Gdx.files.local(fileName);
@@ -583,25 +643,41 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             case ListenStories.FUNCTION_CREATEMP3:
                 this.createMissingMp3();
                 break;
+            case ListenStories.FUNCTION_SONG_VARIANT:
+                switchSongVariant();
+                break;
         }
     }
 
-    private void deleteCurrentFileAndText() {
-        if (this.choosenListenStory >= 0) {
-            if (this.music != null) {
-                Gdx.app.log("DELETE", "Stopping and disposing Music object");
-                this.music.stop();
-                this.music.dispose();
-                this.music = null;
-            }
-            this.highlighter = null;
-            this.timingData = null;
+    private void switchSongVariant() {
+        if (songVariantHandles == null || songVariantHandles.length <= 1) return;
+        stopMusic();
+        int nextVariant = (songVariantIndex + 1) % songVariantHandles.length;
+        loadSongVariant(nextVariant);
+        updateAudioButtonVisibility();
+        Gdx.graphics.requestRendering();
+    }
 
+    private void deleteCurrentFileAndText() {
+        if (this.music != null) {
+            Gdx.app.log("DELETE", "Stopping and disposing Music object");
+            this.music.stop();
+            this.music.dispose();
+            this.music = null;
+        }
+        this.highlighter = null;
+        this.timingData = null;
+
+        // Delete song variant MP3s
+        if (this.isSong && this.songVariantHandles != null) {
+            for (FileHandle variant : this.songVariantHandles) {
+                deleteFileWithNio(variant.file());
+            }
+            this.songVariantHandles = null;
+        } else if (this.choosenListenStory >= 0) {
             FileHandle mp3FileHandle = this.fileMP3Handles[this.choosenListenStory];
             File mp3File = mp3FileHandle.file();
             Gdx.app.log("DELETE", "MP3 path: " + mp3File.getAbsolutePath());
-            Gdx.app.log("DELETE", "MP3 exists: " + mp3File.exists() + ", canWrite: " + mp3File.canWrite() + ", length: " + mp3File.length());
-
             deleteFileWithNio(mp3File);
 
             // Delete associated JSON timing file
@@ -678,6 +754,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         }
 
         findImageStory();
+        // Detect song from filename before findListenStory
+        String fileName = this.fileTXTHandles[this.choosenReadStory].file().getName();
+        this.isSong = fileName.endsWith("_song.txt");
         findListenStory();
         this.setTextInTextArea(this.fileTXTHandles[this.choosenReadStory].readString());
     }
@@ -711,6 +790,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         String searchName = this.fileTXTHandles[this.choosenReadStory].file().getName();
         searchName = searchName.substring(0, searchName.length() - 4);
         this.choosenListenStory = -1;
+        this.songVariantIndex = 0;
+        this.songVariantHandles = null;
         if (this.music != null) {
             this.music.stop();
             this.music.dispose();
@@ -719,41 +800,116 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.totalDuration = 0f;
         this.timingData = null;
         this.highlighter = null;
-        int index = 0;
-        for (FileHandle fileHandle : this.fileMP3Handles) {
-            String fileName = fileHandle.file().getName();
-            if (fileName.substring(0, fileName.length() - 4).equals(searchName)) {
-                this.choosenListenStory = index;
-                this.music = Gdx.audio.newMusic(this.fileMP3Handles[this.choosenListenStory]);
-                this.music.setOnCompletionListener(m -> {
-                    this.lastRenderedSecond = -1;
-                    this.highlighter = null;
-                    Gdx.graphics.setContinuousRendering(false);
-                    updateAudioButtonVisibility();
-                    Gdx.graphics.requestRendering();
-                });
-                try {
-                    Mp3File mp3 = new Mp3File(fileHandle.file());
-                    this.totalDuration = mp3.getLengthInSeconds();
-                } catch (Exception e) {
-                    Gdx.app.log("ListenStories", "Could not read MP3 duration: " + e.getMessage());
+
+        // For songs, find all variant MP3s (_song_v1, _song_v2, or just _song)
+        if (this.isSong) {
+            ArrayList<FileHandle> variants = new ArrayList<>();
+            for (FileHandle fileHandle : this.fileMP3Handles) {
+                String fileName = fileHandle.file().getName();
+                String fileBase = fileName.substring(0, fileName.length() - 4);
+                if (fileBase.equals(searchName) || fileBase.startsWith(searchName + "_v")) {
+                    variants.add(fileHandle);
                 }
-                // Load word timing data if JSON exists
-                String jsonPath = Prompt.DIRECTORY + searchName + ".json";
-                this.timingData = WordTimingData.loadFromFile(jsonPath);
-                Gdx.app.log("ListenStories", "Word timing JSON " + (this.timingData != null ? "loaded (" + this.timingData.getWords().size() + " words)" : "not found") + " for " + searchName);
-                break;
             }
-            index += 1;
+            if (!variants.isEmpty()) {
+                this.songVariantHandles = variants.toArray(new FileHandle[0]);
+                this.songVariantIndex = 0;
+                loadSongVariant(0);
+            }
+        } else {
+            int index = 0;
+            for (FileHandle fileHandle : this.fileMP3Handles) {
+                String fileName = fileHandle.file().getName();
+                if (fileName.substring(0, fileName.length() - 4).equals(searchName)) {
+                    this.choosenListenStory = index;
+                    loadMusicFromFile(fileHandle, searchName);
+                    break;
+                }
+                index += 1;
+            }
         }
 
-        boolean hasMp3 = choosenListenStory != -1;
+        boolean hasMp3 = choosenListenStory != -1 || (songVariantHandles != null && songVariantHandles.length > 0);
         getMainPanel().getButtonByFunction(FUNCTION_UPLOAD_TONIE).setVisible(hasMp3);
-        getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(!hasMp3);
+        getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(!hasMp3 && !isSong);
+
+        // Hide "Vorlesen" button for songs
+        if (isSong) {
+            getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(false);
+        }
+
+        // Show song variant button only for songs with more than 1 variant
+        if (isSong && songVariantHandles != null && songVariantHandles.length > 1) {
+            getMainPanel().getButtonByFunction(FUNCTION_SONG_VARIANT).setVisible(true);
+        } else {
+            getMainPanel().getButtonByFunction(FUNCTION_SONG_VARIANT).setVisible(false);
+        }
 
         updateLayout();
         updateAudioButtonVisibility();
         this.setVisibleFalseWhenNotSet();
+    }
+
+    private void loadMusicFromFile(FileHandle fileHandle, String searchName) {
+        this.music = Gdx.audio.newMusic(fileHandle);
+        this.music.setOnCompletionListener(m -> {
+            this.lastRenderedSecond = -1;
+            this.highlighter = null;
+            Gdx.graphics.setContinuousRendering(false);
+            updateAudioButtonVisibility();
+            Gdx.graphics.requestRendering();
+        });
+        try {
+            Mp3File mp3 = new Mp3File(fileHandle.file());
+            this.totalDuration = mp3.getLengthInSeconds();
+        } catch (Exception e) {
+            Gdx.app.log("ListenStories", "Could not read MP3 duration: " + e.getMessage());
+        }
+        String jsonPath = Prompt.DIRECTORY + searchName + ".json";
+        this.timingData = WordTimingData.loadFromFile(jsonPath);
+        Gdx.app.log("ListenStories", "Word timing JSON " + (this.timingData != null ? "loaded (" + this.timingData.getWords().size() + " words)" : "not found") + " for " + searchName);
+    }
+
+    private void updateSongVariantButtonText() {
+        if (songVariantHandles != null && songVariantHandles.length > 1) {
+            getMainPanel().getButtonByFunction(FUNCTION_SONG_VARIANT).setText(
+                    "V" + (songVariantIndex + 1) + "/" + songVariantHandles.length);
+        }
+    }
+
+    private void loadSongVariant(int variantIndex) {
+        if (songVariantHandles == null || variantIndex >= songVariantHandles.length) return;
+        if (this.music != null) {
+            this.music.stop();
+            this.music.dispose();
+            this.music = null;
+        }
+        this.songVariantIndex = variantIndex;
+        updateSongVariantButtonText();
+        FileHandle variantFile = songVariantHandles[variantIndex];
+        this.choosenListenStory = -1;
+        // Find the index in fileMP3Handles
+        for (int i = 0; i < fileMP3Handles.length; i++) {
+            if (fileMP3Handles[i].path().equals(variantFile.path())) {
+                this.choosenListenStory = i;
+                break;
+            }
+        }
+        this.music = Gdx.audio.newMusic(variantFile);
+        this.music.setOnCompletionListener(m -> {
+            this.lastRenderedSecond = -1;
+            Gdx.graphics.setContinuousRendering(false);
+            updateAudioButtonVisibility();
+            Gdx.graphics.requestRendering();
+        });
+        try {
+            Mp3File mp3 = new Mp3File(variantFile.file());
+            this.totalDuration = mp3.getLengthInSeconds();
+        } catch (Exception e) {
+            Gdx.app.log("ListenStories", "Could not read MP3 duration: " + e.getMessage());
+        }
+        this.timingData = null;
+        this.highlighter = null;
     }
 
     private void nextPage(int add) {
@@ -892,7 +1048,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
             this.nextText = null;
         } else if (this.nextRunning != null) {
-            if (this.nextRunning == Running.NONE && this.running == Running.CREATE_STORY) {
+            if (this.nextRunning == Running.NONE && (this.running == Running.CREATE_STORY || this.running == Running.CREATE_SONG)) {
                 getMainPanel().getButtonByFunction(FUNCTION_NEXT_STORY).setVisible(true);
                 getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_STORY).setVisible(true);
                 getMainPanel().getButtonByFunction(FUNCTION_DELETE).setVisible(true);
@@ -900,10 +1056,17 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             }
 
             this.running = this.nextRunning;
+            if (this.nextRunning == Running.NONE) {
+                this.statusText = "";
+            }
 
             Gdx.graphics.requestRendering();
 
             this.nextRunning = null;
+        } else if (this.nextStatusText != null) {
+            this.statusText = this.nextStatusText;
+            this.nextStatusText = null;
+            Gdx.graphics.requestRendering();
         } else if (this.reload) {
             reloadFileHandler(this.choosenReadStory);
 
@@ -928,7 +1091,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().spriteBatch.begin();
         if (this.running != Running.CREATE_STORY) {
             if (this.choosenReadStory >= 0) {
-                getMainPanel().drawString("Story: " + this.fileTXTHandles[this.choosenReadStory].file().getName(), Constants.GAME_WIDTH / 2f, 50, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.MIDDLE, true, false);
+                String fileLabel = (this.isSong ? "Song: " : "Story: ") + this.fileTXTHandles[this.choosenReadStory].file().getName();
+                getMainPanel().drawString(fileLabel, Constants.GAME_WIDTH / 2f, 50, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.MIDDLE, true, false);
             }
             if (this.choosenListenStory >= 0) {
                 getMainPanel().drawString("Audio: " + this.fileMP3Handles[this.choosenListenStory].file().getName(), Constants.GAME_WIDTH / 2f, 70, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, false);
@@ -1009,7 +1173,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             getMainPanel().getRenderer().end();
 
             getMainPanel().spriteBatch.begin();
-            getMainPanel().drawString(Localization.getInstance().getCommon().get(this.running.getId()), Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT / 2f - 20, Constants.COLOR_BLACK, AssetLoader.font40, DrawString.MIDDLE, false, false);
+            getMainPanel().drawString(Localization.getInstance().getCommon().get(this.running.getId()), Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT / 2f - 30, Constants.COLOR_BLACK, AssetLoader.font40, DrawString.MIDDLE, false, false);
+            if (!this.statusText.isEmpty()) {
+                getMainPanel().drawString(this.statusText, Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT / 2f + 10, Constants.COLOR_BLACK, AssetLoader.font20, DrawString.MIDDLE, false, false);
+            }
             getMainPanel().spriteBatch.end();
         }
     }
@@ -1050,10 +1217,15 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
 
         // Label and duration on audio row (only when MP3 exists)
-        if (this.choosenListenStory >= 0) {
+        if (this.choosenListenStory >= 0 || (this.songVariantHandles != null && this.songVariantHandles.length > 0)) {
             float textY = ROW2_Y + ROW_HEIGHT / 2f - 12;
             getMainPanel().spriteBatch.begin();
-            String label = Localization.getInstance().getCommon().get("listen_music");
+            String label;
+            if (this.isSong) {
+                label = Localization.getInstance().getCommon().get("listen_song");
+            } else {
+                label = Localization.getInstance().getCommon().get("listen_music");
+            }
             getMainPanel().drawString(label, ROW_BG_X + 15, textY, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);
 
             if (this.music != null && this.totalDuration > 0) {

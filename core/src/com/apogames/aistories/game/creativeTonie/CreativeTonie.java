@@ -141,6 +141,11 @@ public class CreativeTonie extends SequentiallyThinkingScreenModel implements Ma
     }
 
     @Override
+    public void setStatusText(String statusText) {
+
+    }
+
+    @Override
     public void setTextForTextArea(String text) {
 
     }

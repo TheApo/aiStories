@@ -3,6 +3,7 @@ package com.apogames.aistories.game.menu;
 import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
 import com.apogames.aistories.game.main.ChatGPTIO;
+import com.apogames.aistories.game.main.SunoApiIO;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
@@ -21,6 +22,8 @@ public class Menu extends SequentiallyThinkingScreenModel {
 
     public static final String FUNCTION_ALLMP3S = "MENU_ALLMP3S";
 
+    public static final String FUNCTION_CREATESONG = "MENU_CREATESONG";
+
     private final boolean[] keys = new boolean[256];
 
     private boolean isPressed = false;
@@ -36,9 +39,15 @@ public class Menu extends SequentiallyThinkingScreenModel {
         getMainPanel().getButtonByFunction(FUNCTION_LANGUAGE).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_CREATESTORY).setVisible(true);
         getMainPanel().getButtonByFunction(FUNCTION_ALLMP3S).setVisible(true);
+        getMainPanel().getButtonByFunction(FUNCTION_CREATESONG).setVisible(true);
 
         if (!getMainPanel().isStoryAvailable()) {
             getMainPanel().getButtonByFunction(FUNCTION_ALLMP3S).setVisible(false);
+        }
+
+        boolean hasSuno = SunoApiIO.API_KEY != null && !SunoApiIO.API_KEY.isEmpty();
+        if (!hasSuno) {
+            getMainPanel().getButtonByFunction(FUNCTION_CREATESONG).setVisible(false);
         }
     }
 
@@ -102,6 +111,9 @@ public class Menu extends SequentiallyThinkingScreenModel {
                 break;
             case Menu.FUNCTION_ALLMP3S:
                 getMainPanel().changeToListenStories();
+                break;
+            case Menu.FUNCTION_CREATESONG:
+                getMainPanel().changeToCreateSong();
                 break;
             case Menu.FUNCTION_LANGUAGE:
                 this.language = this.language.getNext(1);

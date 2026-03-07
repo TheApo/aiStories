@@ -8,6 +8,8 @@ import com.apogames.aistories.game.listenStories.ListenStories;
 import com.apogames.aistories.game.main.ChatGPTIO;
 import com.apogames.aistories.game.main.Prompt;
 import com.apogames.aistories.game.menu.Menu;
+import com.apogames.aistories.game.settings.SongSettings;
+import com.apogames.aistories.game.settings.SongSettingsScreen;
 import com.apogames.aistories.game.settings.StorySettings;
 import com.apogames.aistories.game.settings.StorySettingsScreen;
 import com.apogames.aistories.game.customEntity.CustomImageManager;
@@ -50,8 +52,12 @@ public class MainPanel extends GameScreen {
     private CustomEntityEditor customEntityEditor;
     private Menu menu;
     private StorySettingsScreen storySettingsScreen;
+    private SongSettingsScreen songSettingsScreen;
 
     private StorySettings storySettings;
+    private SongSettings songSettings;
+
+    private boolean songMode;
 
     private CustomEntity customMainEntity;
     private CustomEntity customSupportingEntity;
@@ -72,6 +78,9 @@ public class MainPanel extends GameScreen {
 
         this.storySettings = new StorySettings();
         this.storySettings.load();
+
+        this.songSettings = new SongSettings();
+        this.songSettings.load();
 
         FileHandle dirHandle = Gdx.files.local(Prompt.DIRECTORY);
 
@@ -113,6 +122,9 @@ public class MainPanel extends GameScreen {
         if (this.storySettingsScreen == null) {
             this.storySettingsScreen = new StorySettingsScreen(this);
         }
+        if (this.songSettingsScreen == null) {
+            this.songSettingsScreen = new SongSettingsScreen(this);
+        }
 
         this.getPromptObject().updateFromSettings(this.storySettings);
 
@@ -151,6 +163,7 @@ public class MainPanel extends GameScreen {
     }
 
     public void changeToCreateStory() {
+        this.songMode = false;
         this.changeModel(this.createStory);
     }
 
@@ -168,6 +181,12 @@ public class MainPanel extends GameScreen {
         }
     }
 
+    public void changeToListenStoriesForSong() {
+        this.listenStory.createNewSong();
+        this.changeModel(this.listenStory);
+        this.listenStory.setButtonsInsivislbe();
+    }
+
     public void changeToCreativeTonie(FileHandle fileHandle) {
         this.creativeTonie.setFileHandle(fileHandle);
         this.changeModel(this.creativeTonie);
@@ -182,8 +201,29 @@ public class MainPanel extends GameScreen {
         this.changeModel(this.storySettingsScreen);
     }
 
+    public void changeToCreateSong() {
+        this.songMode = true;
+        this.changeModel(this.createStory);
+    }
+
+    public void changeToSongSettings() {
+        this.changeModel(this.songSettingsScreen);
+    }
+
     public StorySettings getStorySettings() {
         return this.storySettings;
+    }
+
+    public SongSettings getSongSettings() {
+        return this.songSettings;
+    }
+
+    public boolean isSongMode() {
+        return this.songMode;
+    }
+
+    public void setSongMode(boolean songMode) {
+        this.songMode = songMode;
     }
 
     public void reInit() {
@@ -208,6 +248,10 @@ public class MainPanel extends GameScreen {
      * Update level chooser.
      */
     public void saveProperties() {
+    }
+
+    public ListenStories getListenStory() {
+        return this.listenStory;
     }
 
     public ChatGPTIO getChatGPT() {

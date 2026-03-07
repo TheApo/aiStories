@@ -527,6 +527,48 @@ public class Textfield extends ApoButton {
         if (!this.bEnabled || !this.isSelect()) {
             return;
         }
+        if (character == 1) {
+            // Ctrl+A: select all
+            this.selectedPosition.x = 0;
+            this.selectedPosition.y = this.curString.length();
+            this.setPosition(this.curString.length());
+            return;
+        }
+        if (character == 3) {
+            // Ctrl+C: copy selection to clipboard
+            String sel = this.getSelectedString();
+            if (sel != null && !sel.isEmpty()) {
+                Gdx.app.getClipboard().setContents(sel);
+            }
+            return;
+        }
+        if (character == 24) {
+            // Ctrl+X: cut selection to clipboard
+            String sel = this.getSelectedString();
+            if (sel != null && !sel.isEmpty()) {
+                Gdx.app.getClipboard().setContents(sel);
+                this.deleteSelectedString();
+            }
+            return;
+        }
+        if (character == 22) {
+            // Ctrl+V: paste from clipboard
+            String clip = Gdx.app.getClipboard().getContents();
+            if (clip != null && !clip.isEmpty()) {
+                String s = this.getSelectedString();
+                if (s != null && !s.isEmpty()) {
+                    this.deleteSelectedString();
+                }
+                if (this.curString.length() + clip.length() <= this.maxLength) {
+                    this.curString = this.curString.substring(0, this.position) + clip + this.curString.substring(this.position);
+                    this.position += clip.length();
+                    this.showLine();
+                    this.selectedPosition.x = -1;
+                    this.selectedPosition.y = -1;
+                }
+            }
+            return;
+        }
         if (character == 8) {
             String s = this.getSelectedString();
             if ((s != null) && (s.length() > 0)) {

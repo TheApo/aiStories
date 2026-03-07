@@ -8,6 +8,7 @@ import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
 import com.apogames.backend.GameScreen;
 import com.apogames.common.Localization;
+import com.apogames.entity.ApoButtonCheckIcon;
 import com.apogames.entity.ApoButtonEditIcon;
 import com.apogames.entity.ApoButtonMovement;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -26,6 +27,7 @@ public class ObjectSelection implements ObjectSelectionInterface {
     private final static String UP = "UP";
     private final static String DOWN = "DOWN";
     private final static String JUMPCUSTOM = "JUMPCUSTOM";
+    private final static String TOGGLE = "TOGGLE";
 
     @Getter
     private final int x;
@@ -46,8 +48,11 @@ public class ObjectSelection implements ObjectSelectionInterface {
     private final ApoButtonMovement upButton;
     private final ApoButtonMovement downButton;
     private ApoButtonEditIcon jumpCustomButton;
+    private ApoButtonCheckIcon toggleButton;
     @Getter
     private CustomEntity customEntity;
+    @Getter
+    private boolean enabled = true;
 
     private final List<EnumInterface> allOptions;
     private int currentIndex;
@@ -118,13 +123,33 @@ public class ObjectSelection implements ObjectSelectionInterface {
             this.jumpCustomButton.setVisible(false);
             main.getButtons().add(this.jumpCustomButton);
         }
+
+        // Toggle button — top-left corner of the image
+        function = this.id + "_" + TOGGLE;
+        int toggleSize = 48;
+        int imageLeft = x + width / 2 - 100;
+        int imageTop = y + height / 2 - 100 - 50;
+        int toggleX = imageLeft - toggleSize / 2 + 8;
+        int toggleY = imageTop - toggleSize / 2 + 8;
+        this.toggleButton = new ApoButtonCheckIcon(toggleX, toggleY, toggleSize, function, this.background_color, Constants.COLOR_BLACK);
+        this.toggleButton.setVisible(false);
+        main.getButtons().add(this.toggleButton);
     }
 
     public void setNeededButtonsVisible() {
-        this.upButton.setVisible(true);
-        this.downButton.setVisible(true);
-        if (this.jumpCustomButton != null) {
-            this.jumpCustomButton.setVisible(true);
+        this.toggleButton.setVisible(true);
+        if (this.enabled) {
+            this.upButton.setVisible(true);
+            this.downButton.setVisible(true);
+            if (this.jumpCustomButton != null) {
+                this.jumpCustomButton.setVisible(true);
+            }
+        } else {
+            this.upButton.setVisible(false);
+            this.downButton.setVisible(false);
+            if (this.jumpCustomButton != null) {
+                this.jumpCustomButton.setVisible(false);
+            }
         }
     }
 
@@ -149,6 +174,14 @@ public class ObjectSelection implements ObjectSelectionInterface {
 
     @Override
     public void mouseButtonFunction(String function) {
+        if (function.equals(this.id + "_" + TOGGLE)) {
+            this.enabled = !this.enabled;
+            this.toggleButton.toggle();
+            setNeededButtonsVisible();
+            return;
+        }
+        if (!this.enabled) return;
+
         if (function.equals(this.id + "_" + UP)) {
             if (!this.allOptions.isEmpty()) {
                 this.currentIndex = (this.currentIndex - 1 + this.allOptions.size()) % this.allOptions.size();
@@ -166,7 +199,6 @@ public class ObjectSelection implements ObjectSelectionInterface {
             }
 
         } else if (function.equals(this.id + "_" + JUMPCUSTOM)) {
-            // Jump to the custom option
             if (this.customEntity != null) {
                 for (int i = 0; i < this.allOptions.size(); i++) {
                     if (this.allOptions.get(i) == this.customEntity) {
@@ -175,9 +207,12 @@ public class ObjectSelection implements ObjectSelectionInterface {
                         break;
                     }
                 }
-    
             }
         }
+    }
+
+    public String getToggleFunctionId() {
+        return this.id + "_" + TOGGLE;
     }
 
     @Override
@@ -186,11 +221,12 @@ public class ObjectSelection implements ObjectSelectionInterface {
     }
 
     public void renderFilled(GameScreen screen, float[] color, int changeX, int changeY) {
-        screen.getRenderer().setColor(color[0], color[1], color[2], 0.6f);
+        float alpha = this.enabled ? 0.6f : 0.2f;
+        screen.getRenderer().setColor(color[0], color[1], color[2], alpha);
         screen.getRenderer().roundedRect(this.x + changeX, this.y + changeY, this.width, this.height, 10);
 
         if (this.gameObjective.getImage() != null) {
-            screen.getRenderer().setColor(color[0], color[1], color[2], 1f);
+            screen.getRenderer().setColor(color[0], color[1], color[2], this.enabled ? 1f : 0.3f);
             screen.getRenderer().rect(this.x + changeX + this.width / 2f - this.gameObjective.getImage().getRegionWidth() / 2f - 2, this.y + changeY + this.height / 2f - this.gameObjective.getImage().getRegionHeight() / 2f - 50 - 2, this.gameObjective.getImage().getRegionWidth() + 4, this.gameObjective.getImage().getRegionHeight() + 4);
         }
     }
@@ -203,6 +239,8 @@ public class ObjectSelection implements ObjectSelectionInterface {
 
     @Override
     public void renderSprite(GameScreen screen, int changeX, int changeY) {
+        float[] textColor = this.enabled ? BACKGROUND_BORDER_COLOR : new float[]{0.5f, 0.5f, 0.5f, 1f};
+
         String categoryName = Localization.getInstance().getCommon().get(this.gameObjective.getEnumName());
 
         BitmapFont font = AssetLoader.font30;
@@ -211,7 +249,7 @@ public class ObjectSelection implements ObjectSelectionInterface {
             font = AssetLoader.font25;
         }
 
-        screen.drawString(categoryName, this.x + changeX + this.width / 2f, this.y + changeY + 110, BACKGROUND_BORDER_COLOR, font, DrawString.MIDDLE, true, false);
+        screen.drawString(categoryName, this.x + changeX + this.width / 2f, this.y + changeY + 110, textColor, font, DrawString.MIDDLE, true, false);
 
         // Use getDisplayName() for the character name (supports custom characters)
         String displayName = this.gameObjective.getDisplayName();
@@ -220,7 +258,7 @@ public class ObjectSelection implements ObjectSelectionInterface {
         if (screen.getGlyphLayout().width > this.width - 20) {
             font = AssetLoader.font20;
         }
-        screen.drawString(displayName, this.x + changeX + this.width / 2f, this.y + changeY + this.height - 220, BACKGROUND_BORDER_COLOR, font, DrawString.MIDDLE, true, false);
+        screen.drawString(displayName, this.x + changeX + this.width / 2f, this.y + changeY + this.height - 220, textColor, font, DrawString.MIDDLE, true, false);
 
         // Use getDisplayDetails() for the details (supports custom characters)
         String details = this.gameObjective.getDisplayDetails();
@@ -231,11 +269,17 @@ public class ObjectSelection implements ObjectSelectionInterface {
             startY -= 15 * (lineCount - 3);
         }
         for (int i = 0; i < lineCount; i++) {
-            screen.drawString(wrappedLines.get(i), this.x + changeX + this.width / 2f, this.y + changeY + startY + this.height - 140 + i * 15, BACKGROUND_BORDER_COLOR, AssetLoader.font15, DrawString.MIDDLE, true, false);
+            screen.drawString(wrappedLines.get(i), this.x + changeX + this.width / 2f, this.y + changeY + startY + this.height - 140 + i * 15, textColor, AssetLoader.font15, DrawString.MIDDLE, true, false);
         }
 
         if (this.gameObjective.getImage() != null) {
+            if (this.enabled) {
+                screen.spriteBatch.setColor(1f, 1f, 1f, 1f);
+            } else {
+                screen.spriteBatch.setColor(1f, 1f, 1f, 0.3f);
+            }
             screen.spriteBatch.draw(this.gameObjective.getImage(), this.x + changeX + this.width / 2f - this.gameObjective.getImage().getRegionWidth() / 2f, this.y + changeY + this.height / 2f - this.gameObjective.getImage().getRegionHeight() / 2f - 50);
+            screen.spriteBatch.setColor(1f, 1f, 1f, 1f);
         }
     }
 
