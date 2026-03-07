@@ -6,8 +6,8 @@ No API keys required to get started — children can pick story elements and wri
 
 With optional API keys you unlock more magic, step by step:
 
-- **ChatGPT or Gemini API Key** — The AI generates a unique story based on your selections
-- **+ ElevenLabs API Key** — The story is read aloud with a configurable voice
+- **ChatGPT or Gemini API Key** — The AI generates unique stories and creates custom artwork for your characters in 12 different styles
+- **+ ElevenLabs API Key** — The story is read aloud with a configurable voice, with real-time word highlighting as you listen
 - **+ Tonies Cloud Login** — Upload the audio directly to your Creative Tonie figure
 - **+ Suno API Key** — Generate original songs with lyrics, melodies, and multiple music styles
 
