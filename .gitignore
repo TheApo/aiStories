@@ -122,3 +122,5 @@ save/
 data/
 
 custom_images/
+
+.claude/
