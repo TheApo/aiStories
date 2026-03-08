@@ -187,6 +187,12 @@ public class MainPanel extends GameScreen {
         this.listenStory.setButtonsInsivislbe();
     }
 
+    public void changeToListenStoriesForLyrics() {
+        this.listenStory.createNewLyrics();
+        this.changeModel(this.listenStory);
+        this.listenStory.setButtonsInsivislbe();
+    }
+
     public void changeToCreativeTonie(FileHandle fileHandle) {
         this.creativeTonie.setFileHandle(fileHandle);
         this.changeModel(this.creativeTonie);

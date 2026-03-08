@@ -188,6 +188,9 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
     public void keyPressed(int keyCode, char character) {
         super.keyPressed(keyCode, character);
         keys[keyCode] = true;
+        if (promptField.isSelect()) {
+            promptField.keyDown(keyCode);
+        }
     }
 
     @Override
@@ -203,7 +206,7 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
             keys[keyCode] = false;
         }
         if (promptField.isSelect()) {
-            promptField.handleNavigationKey(keyCode);
+            promptField.keyUp(keyCode);
         }
     }
 

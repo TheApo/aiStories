@@ -11,6 +11,10 @@ public class SongSettings {
 
     private static final String PREFS_NAME = "AIStoriesSongSettings";
 
+    public enum SongGenerationMode {
+        SUNO_ONLY, GPT_SUNO, GEMINI_SUNO
+    }
+
     public enum MusicStyle {
         POP, ROCK, COUNTRY, HIPHOP, LULLABY, PIANO, ELECTRONIC, MUSICAL
     }
@@ -31,6 +35,7 @@ public class SongSettings {
     private SongLength songLength = SongLength.MEDIUM;
     private String promptTemplate = "";
     private boolean includeObjectives = true;
+    private SongGenerationMode generationMode = SongGenerationMode.SUNO_ONLY;
 
     public void save() {
         Preferences prefs = Gdx.app.getPreferences(PREFS_NAME);
@@ -39,6 +44,7 @@ public class SongSettings {
         prefs.putString("songLength", songLength.name());
         prefs.putString("promptTemplate", promptTemplate);
         prefs.putBoolean("includeObjectives", includeObjectives);
+        prefs.putString("generationMode", generationMode.name());
         prefs.flush();
     }
 
@@ -61,6 +67,11 @@ public class SongSettings {
         }
         promptTemplate = prefs.getString("promptTemplate", "");
         includeObjectives = prefs.getBoolean("includeObjectives", true);
+        try {
+            generationMode = SongGenerationMode.valueOf(prefs.getString("generationMode", SongGenerationMode.SUNO_ONLY.name()));
+        } catch (IllegalArgumentException e) {
+            generationMode = SongGenerationMode.SUNO_ONLY;
+        }
     }
 
     public String getAgeDescription() {

@@ -2,9 +2,7 @@ package com.apogames.aistories.game.createStory;
 
 import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
-import com.apogames.aistories.game.main.ChatGPTIO;
-import com.apogames.aistories.game.main.SongPrompt;
-import com.apogames.aistories.game.main.SunoApiIO;
+import com.apogames.aistories.game.main.*;
 import com.apogames.aistories.game.objects.*;
 import com.apogames.aistories.game.settings.SongSettings;
 import com.apogames.asset.AssetLoader;
@@ -12,6 +10,7 @@ import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
 import com.apogames.common.Localization;
 import com.apogames.entity.ApoButton;
+import com.apogames.entity.ApoButtonSegmented;
 import com.apogames.entity.ApoButtonSwitch;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
@@ -33,8 +32,16 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
     private boolean isPressed = false;
 
+    private static final String FUNCTION_SONG_MODE = "CREATESTORY_SONG_MODE";
+
+    private static final SongSettings.SongGenerationMode[] SONG_MODES = {
+            SongSettings.SongGenerationMode.SUNO_ONLY,
+            SongSettings.SongGenerationMode.GPT_SUNO,
+            SongSettings.SongGenerationMode.GEMINI_SUNO
+    };
 
     private ArrayList<ObjectSelection> objectSelection;
+    private ApoButtonSegmented songModeButton;
 
     public CreateStory(final MainPanel game) {
         super(game);
@@ -48,9 +55,10 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         getMainPanel().getButtonByFunction(FUNCTION_SETTINGS).setVisible(true);
 
         if (getMainPanel().isSongMode()) {
-            // Song mode: hide LLM switch, change generate button text
+            // Song mode: hide LLM switch, show song mode selector instead
             getMainPanel().getButtonByFunction(FUNCTION_LLM).setVisible(false);
             getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setId("button_generate_song");
+            initSongModeButton();
         } else {
             getMainPanel().getButtonByFunction(FUNCTION_GENERATE_TEXT).setId("button_start");
             boolean hasOpenAI = ChatGPTIO.API_KEY != null && !ChatGPTIO.API_KEY.isEmpty() && !ChatGPTIO.API_KEY.equals("Dein ChatGPT API Key");
@@ -91,6 +99,47 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         this.getMainPanel().resetSize(Constants.GAME_WIDTH, Constants.GAME_HEIGHT);
 
         this.setNeededButtonsVisible();
+    }
+
+    private void initSongModeButton() {
+        boolean hasOpenAI = ChatGPTIO.API_KEY != null && !ChatGPTIO.API_KEY.isEmpty() && !ChatGPTIO.API_KEY.equals("Dein ChatGPT API Key");
+        boolean hasGemini = ChatGPTIO.GEMINI_API_KEY != null && !ChatGPTIO.GEMINI_API_KEY.isEmpty() && !ChatGPTIO.GEMINI_API_KEY.equals("Dein Gemini API Key");
+
+        if (songModeButton == null) {
+            songModeButton = new ApoButtonSegmented(0, 10, FUNCTION_SONG_MODE);
+            songModeButton.addOption("Suno");
+            songModeButton.addOption("GPT - Suno");
+            songModeButton.addOption("Gemini - Suno");
+        }
+
+        songModeButton.setOptionVisible(1, hasOpenAI);
+        songModeButton.setOptionVisible(2, hasGemini);
+        songModeButton.setVisible(true);
+
+        // Calculate layout to get width, then right-align and recalc positions
+        songModeButton.ensureLayout();
+        int rightX = Constants.GAME_WIDTH - (int) songModeButton.getWidth() - 10;
+        if ((int) songModeButton.getX() != rightX) {
+            songModeButton.setX(rightX);
+            songModeButton.invalidateLayout();
+        }
+
+        // Sync selection from settings
+        SongSettings.SongGenerationMode mode = getMainPanel().getSongSettings().getGenerationMode();
+        if (mode == SongSettings.SongGenerationMode.GPT_SUNO && !hasOpenAI) {
+            mode = SongSettings.SongGenerationMode.SUNO_ONLY;
+            getMainPanel().getSongSettings().setGenerationMode(mode);
+        }
+        if (mode == SongSettings.SongGenerationMode.GEMINI_SUNO && !hasGemini) {
+            mode = SongSettings.SongGenerationMode.SUNO_ONLY;
+            getMainPanel().getSongSettings().setGenerationMode(mode);
+        }
+        for (int i = 0; i < SONG_MODES.length; i++) {
+            if (SONG_MODES[i] == mode) {
+                songModeButton.setSelectedIndex(i);
+                break;
+            }
+        }
     }
 
     private void createObjectSelection() {
@@ -135,10 +184,17 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
     }
 
     public void mouseMoved(int mouseX, int mouseY) {
+        if (songModeButton != null) {
+            songModeButton.updateHover(mouseX, mouseY);
+        }
     }
 
     public void mouseButtonReleased(int mouseX, int mouseY, boolean isRightButton) {
         this.isPressed = false;
+        if (getMainPanel().isSongMode() && songModeButton != null && songModeButton.handleClick(mouseX, mouseY)) {
+            getMainPanel().getSongSettings().setGenerationMode(SONG_MODES[songModeButton.getSelectedIndex()]);
+            getMainPanel().getSongSettings().save();
+        }
     }
 
     public void mousePressed(int x, int y, boolean isRightButton) {
@@ -231,30 +287,62 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         go.setObjectives(this.objectSelection.get(4).isEnabled() ? this.objectSelection.get(4).getGameObjective() : null);
     }
 
+    private String buildCharacterHeader(GameObjectives go) {
+        return (go.getMainCharacter() != null ? go.getMainCharacter().getName() : "") + ";"
+                + (go.getSupportingCharacter() != null ? go.getSupportingCharacter().getName() : "") + ";"
+                + (go.getUniverse() != null ? go.getUniverse().getName() : "") + ";"
+                + (go.getPlaces() != null ? go.getPlaces().getName() : "") + ";"
+                + (go.getObjectives() != null ? go.getObjectives().getName() : "");
+    }
+
     private void startSong() {
         Gdx.app.log("create Song", "create Song begin");
         applySelectedObjectives();
 
         GameObjectives go = getMainPanel().getPromptObject().getGameObjectives();
         SongSettings songSettings = getMainPanel().getSongSettings();
+        SongSettings.SongGenerationMode mode = songSettings.getGenerationMode();
 
+        if (mode == SongSettings.SongGenerationMode.SUNO_ONLY) {
+            startSongSunoOnly(go, songSettings);
+        } else {
+            startSongWithLLM(go, songSettings, mode);
+        }
+        Gdx.app.log("create Song", "create Song end");
+    }
+
+    private void startSongSunoOnly(GameObjectives go, SongSettings songSettings) {
         String sunoPrompt = SongPrompt.buildSunoPrompt(songSettings, go);
-
         this.getMainPanel().getTextArea().setText(sunoPrompt);
 
         SunoApiIO sunoApi = new SunoApiIO(getMainPanel().getListenStory());
-        String header = (go.getMainCharacter() != null ? go.getMainCharacter().getName() : "") + ";"
-                + (go.getSupportingCharacter() != null ? go.getSupportingCharacter().getName() : "") + ";"
-                + (go.getUniverse() != null ? go.getUniverse().getName() : "") + ";"
-                + (go.getPlaces() != null ? go.getPlaces().getName() : "") + ";"
-                + (go.getObjectives() != null ? go.getObjectives().getName() : "");
-        sunoApi.setCharacterHeader(header);
+        sunoApi.setCharacterHeader(buildCharacterHeader(go));
 
         getMainPanel().changeToListenStoriesForSong();
 
         Gdx.app.log("SunoPrompt", "Length: " + sunoPrompt.length() + " chars");
         sunoApi.generateSong(sunoPrompt);
-        Gdx.app.log("create Song", "create Song end");
+    }
+
+    private void startSongWithLLM(GameObjectives go, SongSettings songSettings, SongSettings.SongGenerationMode mode) {
+        String lyricsPrompt = SongPrompt.buildLyricsPrompt(songSettings, go);
+        this.getMainPanel().getTextArea().setText(lyricsPrompt);
+
+        String llm = (mode == SongSettings.SongGenerationMode.GPT_SUNO)
+                ? ChatGPTIO.LLM_MODEL_MINI : ChatGPTIO.LLM_MODEL_GEMINI;
+
+        String sunoStyle = SongPrompt.buildSunoStyle(songSettings);
+        String header = buildCharacterHeader(go);
+
+        getMainPanel().changeToListenStoriesForLyrics();
+        getMainPanel().getListenStory().prepareLyricsToSuno(sunoStyle, header);
+
+        ChatGPTIO chatGPT = getMainPanel().getListenStory().getChatGPT();
+        chatGPT.setLlm(llm);
+        chatGPT.reset();
+        chatGPT.sendAnotherMessage(lyricsPrompt);
+        // sendMessage() hardcodes CREATE_STORY — override with CREATE_LYRICS
+        getMainPanel().getListenStory().setRunning(Running.CREATE_LYRICS);
     }
 
     private void start() {
@@ -310,6 +398,11 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         getMainPanel().drawString("Version: " + Constants.VERSION, Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT - 20f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, false);
 
         getMainPanel().spriteBatch.end();
+
+        // Song mode selector
+        if (getMainPanel().isSongMode() && songModeButton != null) {
+            songModeButton.render(getMainPanel(), 0, 0);
+        }
 
         for (ApoButton button : this.getMainPanel().getButtons()) {
             button.render(this.getMainPanel());

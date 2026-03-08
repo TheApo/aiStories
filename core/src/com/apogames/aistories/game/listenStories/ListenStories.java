@@ -69,6 +69,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private int songVariantIndex = 0;
     private FileHandle[] songVariantHandles;
 
+    private boolean pendingSunoCustom = false;
+    private String pendingSunoStyle = "";
+    private String pendingSunoHeader = "";
+
     private FontSize fontSize = FontSize.FONT_25;
 
     @Getter
@@ -471,7 +475,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.running = Running.CREATE_STORY;
         this.currentSpread = 0;
         this.pendingSpread = 0;
-        fitPromptToTwoPages();
+        this.pendingSunoCustom = false;
         this.setButtonsInsivislbe();
     }
 
@@ -480,8 +484,23 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.isSong = true;
         this.currentSpread = 0;
         this.pendingSpread = 0;
-        fitPromptToTwoPages();
+        this.pendingSunoCustom = false;
         this.setButtonsInsivislbe();
+    }
+
+    public void createNewLyrics() {
+        this.running = Running.CREATE_LYRICS;
+        this.isSong = true;
+        this.currentSpread = 0;
+        this.pendingSpread = 0;
+        this.pendingSunoCustom = false;
+        this.setButtonsInsivislbe();
+    }
+
+    public void prepareLyricsToSuno(String style, String characterHeader) {
+        this.pendingSunoCustom = true;
+        this.pendingSunoStyle = style;
+        this.pendingSunoHeader = characterHeader;
     }
 
     private void fitPromptToTwoPages() {
@@ -539,6 +558,18 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     public void setTextForTextArea(String text) {
         this.nextText = text;
         Gdx.graphics.requestRendering();
+    }
+
+    private String extractTitleFromLyrics(String lyrics) {
+        // Try to find a meaningful title from the first verse line (skip tags like [Verse 1])
+        String[] lines = lyrics.split("\n");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("[")) continue;
+            if (trimmed.length() > 100) trimmed = trimmed.substring(0, 100);
+            return trimmed;
+        }
+        return "Song";
     }
 
     private String safeGetName(EnumInterface e) {
@@ -1037,16 +1068,36 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         if (this.nextText != null) {
             String text = this.nextText;
-            this.fontSize = FontSize.FONT_25;
-            this.setTextInTextArea(text);
+            this.nextText = null;
 
-            this.saveText(text);
+            if (this.pendingSunoCustom) {
+                // Two-step flow: lyrics arrived from LLM → display, then start Suno custom mode
+                this.pendingSunoCustom = false;
+                this.fontSize = FontSize.FONT_25;
+                this.setTextInTextArea(text);
+                this.isSong = true;
 
-            reloadFileHandler();
+                if (text == null || text.trim().isEmpty()) {
+                    Gdx.app.error("ListenStories", "LLM returned empty lyrics, skipping Suno");
+                    this.running = Running.NONE;
+                    this.statusText = "Error: No lyrics received";
+                } else {
+                    // Start Suno custom mode with the lyrics
+                    SunoApiIO sunoApi = new SunoApiIO(this);
+                    sunoApi.setCharacterHeader(this.pendingSunoHeader);
+                    String title = extractTitleFromLyrics(text);
+                    sunoApi.generateSongCustom(text, this.pendingSunoStyle, title);
+                }
+            } else {
+                this.fontSize = FontSize.FONT_25;
+                this.setTextInTextArea(text);
+
+                this.saveText(text);
+
+                reloadFileHandler();
+            }
 
             Gdx.graphics.requestRendering();
-
-            this.nextText = null;
         } else if (this.nextRunning != null) {
             if (this.nextRunning == Running.NONE && (this.running == Running.CREATE_STORY || this.running == Running.CREATE_SONG)) {
                 getMainPanel().getButtonByFunction(FUNCTION_NEXT_STORY).setVisible(true);
@@ -1158,7 +1209,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         // Loading overlay
         if (this.running != Running.NONE) {
-            int width = 600;
+            int width = 700;
 
             Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
             getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);

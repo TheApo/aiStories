@@ -36,6 +36,22 @@ public class SunoApiIO {
         this.characterHeader = characterHeader;
     }
 
+    public void generateSongCustom(String lyrics, String style, String title) {
+        main.setRunning(Running.CREATE_SONG);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("prompt", lyrics);
+        payload.put("style", style);
+        payload.put("title", title);
+        payload.put("customMode", true);
+        payload.put("instrumental", false);
+        payload.put("model", "V5");
+        payload.put("callBackUrl", CALLBACK_URL);
+
+        Gdx.app.log("SunoApiIO", "Custom mode: lyrics=" + lyrics.length() + " chars, style=" + style + ", title=" + title);
+        sendGenerateRequest(payload);
+    }
+
     public void generateSong(String prompt) {
         main.setRunning(Running.CREATE_SONG);
 
@@ -46,6 +62,10 @@ public class SunoApiIO {
         payload.put("model", "V5");
         payload.put("callBackUrl", CALLBACK_URL);
 
+        sendGenerateRequest(payload);
+    }
+
+    private void sendGenerateRequest(Map<String, Object> payload) {
         HttpRequestBuilder builder = new HttpRequestBuilder();
         HttpRequest request = builder.newRequest()
                 .method(HttpMethods.POST)
@@ -96,10 +116,18 @@ public class SunoApiIO {
         });
     }
 
+    private String buildStatusText(int elapsedSec) {
+        String duration = Localization.getInstance().getCommon().get("text_song_duration");
+        String wait = Localization.getInstance().getCommon().format("text_song_wait", elapsedSec);
+        return duration + " - " + wait;
+    }
+
     private void startPolling(String taskId) {
         new Thread(() -> {
             long start = System.currentTimeMillis();
             String lastStatus = null;
+
+            Gdx.app.postRunnable(() -> main.setStatusText(buildStatusText(0)));
 
             while (System.currentTimeMillis() - start < MAX_WAIT_MS) {
                 try {
@@ -108,8 +136,7 @@ public class SunoApiIO {
                     break;
                 }
                 int elapsedSec = (int) ((System.currentTimeMillis() - start) / 1000);
-                String waitText = Localization.getInstance().getCommon().format("text_song_wait", elapsedSec);
-                Gdx.app.postRunnable(() -> main.setStatusText(waitText));
+                Gdx.app.postRunnable(() -> main.setStatusText(buildStatusText(elapsedSec)));
 
                 Map<String, Object> details = pollSync(taskId);
                 if (details == null) continue;

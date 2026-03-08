@@ -64,15 +64,27 @@ public class ChatGPTIO {
     }
 
     private void sendOpenAIMessage() {
+        // Log what we're sending
+        for (int i = 0; i < conversationHistory.size(); i++) {
+            Map<String, String> msg = conversationHistory.get(i);
+            String role = msg.get("role");
+            String content = msg.get("content");
+            Gdx.app.log("ChatGPT", "Message[" + i + "] role=" + role + " length=" + (content != null ? content.length() : "null"));
+            if (content != null && content.length() < 500) {
+                Gdx.app.log("ChatGPT", "Message[" + i + "] content: " + content);
+            }
+        }
+
         Map<String, Object> params = new HashMap<>();
         params.put("model", llm);
         params.put("messages", conversationHistory);
         params.put("temperature", 1);
         if (llm.startsWith("gpt-5")) {
-            params.put("max_completion_tokens", 4096);
+            params.put("max_completion_tokens", 16384);
         } else {
             params.put("max_tokens", 4096);
         }
+        Gdx.app.log("ChatGPT", "Sending to OpenAI: model=" + llm + " messages=" + conversationHistory.size());
 
         HttpRequestBuilder builder = new HttpRequestBuilder();
         HttpRequest request = builder.newRequest()
@@ -87,11 +99,14 @@ public class ChatGPTIO {
         Gdx.net.sendHttpRequest(request, new HttpResponseListener() {
             @Override
             public void handleHttpResponse(HttpResponse httpResponse) {
+                int statusCode = httpResponse.getStatus().getStatusCode();
                 String responseStr = httpResponse.getResultAsString();
+                Gdx.app.log("ChatGPT", "OpenAI HTTP status: " + statusCode + " response: " + responseStr);
                 try {
                     Map<String, Object> response = gson.fromJson(responseStr, Map.class);
                     if (response == null) {
-                        Gdx.app.error("HTTP", "Failed to parse response " + responseStr);
+                        Gdx.app.error("ChatGPT", "Failed to parse response " + responseStr);
+                        main.setRunning(Running.NONE);
                         return;
                     }
                     List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
@@ -99,15 +114,29 @@ public class ChatGPTIO {
                         LinkedTreeMap<String, String> messages = (LinkedTreeMap<String, String>) choices.get(0).get("message");
                         if (messages != null && !messages.isEmpty()) {
                             String content = messages.get("content");
+                            Gdx.app.log("ChatGPT", "OpenAI content: " + (content != null ? content.length() + " chars" : "null"));
+                            if (content == null || content.trim().isEmpty()) {
+                                String refusal = messages.get("refusal");
+                                Gdx.app.error("ChatGPT", "OpenAI returned empty content. Refusal: " + refusal);
+                                main.setStatusText("Error: GPT refused - " + (refusal != null ? refusal : "unknown"));
+                                main.setRunning(Running.NONE);
+                                return;
+                            }
                             Map<String, String> gptMessage = new HashMap<>();
                             gptMessage.put("role", "assistant");
                             gptMessage.put("content", content);
                             main.setTextForTextArea(content);
                             conversationHistory.add(gptMessage);
+                        } else {
+                            Gdx.app.error("ChatGPT", "OpenAI message is null/empty. Choice: " + choices.get(0));
+                            main.setStatusText("Error: GPT returned no message");
                         }
+                    } else {
+                        Gdx.app.error("ChatGPT", "OpenAI choices null/empty. Response: " + responseStr);
+                        main.setStatusText("Error: GPT returned no choices");
                     }
                 } catch (Exception e) {
-                    Gdx.app.error("HTTP", "Error processing response", e);
+                    Gdx.app.error("ChatGPT", "Error processing response", e);
                 }
                 main.setRunning(Running.NONE);
             }

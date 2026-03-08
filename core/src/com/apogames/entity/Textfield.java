@@ -312,14 +312,42 @@ public class Textfield extends ApoButton {
         this.showLine();
     }
 
-    /**
-     * Handles navigation keys (LEFT, RIGHT, HOME, END, UP, DOWN).
-     * Returns true if the key was handled.
-     */
-    public boolean handleNavigationKey(int keyCode) {
-        if (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT)) {
-            return handleCtrlKey(keyCode);
+    private int heldKeyCode = -1;
+    private int heldKeyTimer = 0;
+    private boolean heldKeyRepeating = false;
+    private static final int REPEAT_DELAY = 400;
+    private static final int REPEAT_RATE = 50;
+
+    public void keyDown(int keyCode) {
+        if (!this.bEnabled || !this.isSelect()) return;
+        if (isNavigationKey(keyCode) && heldKeyCode != keyCode) {
+            heldKeyCode = keyCode;
+            heldKeyTimer = 0;
+            heldKeyRepeating = false;
+            handleNavigationKey(keyCode);
+            Gdx.graphics.setContinuousRendering(true);
+            Gdx.graphics.requestRendering();
         }
+    }
+
+    public void keyUp(int keyCode) {
+        if (keyCode == heldKeyCode) {
+            heldKeyCode = -1;
+            Gdx.graphics.setContinuousRendering(false);
+        }
+        if (!this.bEnabled || !this.isSelect()) return;
+        if (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT)) {
+            handleCtrlKey(keyCode);
+        }
+    }
+
+    private boolean isNavigationKey(int keyCode) {
+        return keyCode == Input.Keys.LEFT || keyCode == Input.Keys.RIGHT
+                || keyCode == Input.Keys.UP || keyCode == Input.Keys.DOWN
+                || keyCode == Input.Keys.HOME || keyCode == Input.Keys.END;
+    }
+
+    public boolean handleNavigationKey(int keyCode) {
         switch (keyCode) {
             case Input.Keys.LEFT:
                 setPosition(position - 1);
@@ -629,6 +657,19 @@ public class Textfield extends ApoButton {
         if (this.time > this.TIME_LINE) {
             this.time = 0;
             this.bLineOn = !this.bLineOn;
+        }
+        if (heldKeyCode >= 0 && this.isSelect()) {
+            heldKeyTimer += delta;
+            if (!heldKeyRepeating) {
+                if (heldKeyTimer >= REPEAT_DELAY) {
+                    heldKeyRepeating = true;
+                    heldKeyTimer = 0;
+                }
+            }
+            if (heldKeyRepeating && heldKeyTimer >= REPEAT_RATE) {
+                heldKeyTimer -= REPEAT_RATE;
+                handleNavigationKey(heldKeyCode);
+            }
         }
     }
 

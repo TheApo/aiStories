@@ -76,6 +76,75 @@ public class SongPrompt {
         return sb.toString();
     }
 
+    public static String buildLyricsPrompt(SongSettings settings, GameObjectives objectives) {
+        String style = getStyleDescription(settings.getMusicStyle());
+        String age = settings.getAgeDescription();
+        String length = settings.getLengthDescription();
+        String ageTone = getAgeTone(settings.getAgeGroup());
+        String lengthStructure = getLyricsStructure(settings.getSongLength());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Schreibe den Liedtext fuer ein ").append(length).append(" im Stil von ").append(style);
+        sb.append(" fuer Hoerer im Alter von ").append(age).append(".\n\n");
+        sb.append(ageTone).append("\n\n");
+        sb.append(lengthStructure).append("\n\n");
+
+        sb.append("WICHTIG: Formatiere den Text mit folgenden Struktur-Tags auf eigener Zeile:\n");
+        sb.append("[Intro], [Verse 1], [Verse 2], [Verse 3], [Chorus], [Bridge], [Outro]\n");
+        sb.append("Jeder Abschnitt beginnt mit dem passenden Tag. ");
+        sb.append("Der Text muss sich reimen (AABB Schema), eingaengig und singbar sein.\n");
+        sb.append("Schreibe KEINE Reimschema-Markierungen wie (A), (B) oder aehnliches hinter die Zeilen.\n\n");
+
+        sb.append("Gib NUR den Liedtext aus, keine Erklaerungen oder Kommentare.\n\n");
+
+        if (settings.isIncludeObjectives()) {
+            if (objectives.getMainCharacter() != null) {
+                sb.append("Hauptcharakter: ").append(objectives.getMainCharacter().getDisplayName());
+                sb.append(" (").append(objectives.getMainCharacter().getDisplayDetails()).append("). ");
+            }
+            if (objectives.getSupportingCharacter() != null) {
+                sb.append("Nebencharakter: ").append(objectives.getSupportingCharacter().getDisplayName());
+                sb.append(" (").append(objectives.getSupportingCharacter().getDisplayDetails()).append("). ");
+            }
+            if (objectives.getUniverse() != null) {
+                sb.append("Welt: ").append(objectives.getUniverse().getDisplayName());
+                sb.append(" (").append(objectives.getUniverse().getDisplayDetails()).append("). ");
+            }
+            if (objectives.getPlaces() != null) {
+                sb.append("Ort: ").append(objectives.getPlaces().getDisplayName());
+                sb.append(" (").append(objectives.getPlaces().getDisplayDetails()).append("). ");
+            }
+            if (objectives.getObjectives() != null) {
+                sb.append("Objekt: ").append(objectives.getObjectives().getDisplayName());
+                sb.append(" (").append(objectives.getObjectives().getDisplayDetails()).append(").");
+            }
+        }
+
+        String template = settings.getPromptTemplate();
+        if (template != null && !template.isEmpty()) {
+            sb.append("\n\nZusaetzliche Anweisungen: ").append(template);
+        }
+
+        return sb.toString();
+    }
+
+    public static String buildSunoStyle(SongSettings settings) {
+        return getCompactStyle(settings.getMusicStyle()) + " fuer " + settings.getAgeDescription();
+    }
+
+    private static String getLyricsStructure(SongSettings.SongLength length) {
+        switch (length) {
+            case SHORT:
+                return "Struktur: Kurzes Lied mit [Verse 1], [Chorus], [Verse 2], [Chorus]. Maximal 2 Strophen und 2 Refrains.";
+            case MEDIUM:
+                return "Struktur: Mittellanges Lied mit [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Chorus]. 2-3 Strophen, 2-3 Refrains und eine Bridge.";
+            case LONG:
+                return "Struktur: Langes Lied mit [Intro], [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Verse 3], [Chorus], [Outro]. 3 Strophen, 3 Refrains, Bridge und optional Intro/Outro.";
+            default:
+                return "Struktur: 2-3 Strophen, 2-3 Refrains, optional Bridge.";
+        }
+    }
+
     private static final int SUNO_MAX = 500;
 
     // Detail removal order: Universe(2) → Places(3) → SupportingCharacter(1) → Objectives(4) → MainCharacter(0)
