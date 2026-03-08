@@ -94,7 +94,7 @@ public class SongPrompt {
         sb.append("Der [Chorus] hat immer den gleichen Text und wird nach jeder Strophe wiederholt. ");
         sb.append("Formatiere jeden Abschnitt mit dem passenden Tag auf eigener Zeile.\n");
         sb.append("Der Text muss sich reimen (AABB Schema), eingaengig und singbar sein.\n");
-        sb.append("Jede Zeile muss kurz und singbar sein: maximal 6-10 Silben bzw. 4-8 Woerter pro Zeile. ");
+        sb.append("Jede Zeile muss singbar sein: maximal 5-12 Woerter pro Zeile. ");
         sb.append("Keine langen Schachtelsaetze. Schreibe so, wie man es natuerlich singen wuerde.\n");
         sb.append("Schreibe KEINE Reimschema-Markierungen wie (A), (B) oder aehnliches hinter die Zeilen.\n\n");
 
@@ -138,11 +138,17 @@ public class SongPrompt {
     private static String getLyricsStructure(SongSettings.SongLength length) {
         switch (length) {
             case SHORT:
-                return "Struktur (EXAKT einhalten): [Verse 1], [Chorus], [Chorus], [Outro]. Nur 1 Strophe, 2x Chorus, kurzes Outro.";
+                return "Struktur (EXAKT einhalten, ALLE Abschnitte schreiben):\n"
+                        + "[Verse 1] (4 Zeilen)\n[Chorus] (4 Zeilen)\n[Chorus]\n[Outro] (2 Zeilen)\n"
+                        + "Kurzes Lied, ca. 1:30-2:00 Minuten.";
             case MEDIUM:
-                return "Struktur (EXAKT einhalten): [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Outro]. 2 Strophen, nach jeder Strophe ein Chorus, dann Bridge und Outro.";
+                return "Struktur (EXAKT einhalten, ALLE Abschnitte schreiben):\n"
+                        + "[Verse 1] (4-6 Zeilen)\n[Chorus] (4 Zeilen)\n[Verse 2] (4-6 Zeilen)\n[Chorus]\n[Bridge] (4 Zeilen)\n[Chorus]\n[Outro] (2-4 Zeilen)\n"
+                        + "Mittellanges Lied, ca. 2:30-3:00 Minuten.";
             case LONG:
-                return "Struktur (EXAKT einhalten): [Intro], [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Chorus], [Verse 3], [Chorus], [Outro]. Intro, 3 Strophen mit Chorus nach jeder, Bridge mit anschliessendem Chorus, Outro.";
+                return "Struktur (EXAKT einhalten, ALLE Abschnitte schreiben):\n"
+                        + "[Intro] (2-4 Zeilen)\n[Verse 1] (6-8 Zeilen)\n[Chorus] (4-6 Zeilen)\n[Verse 2] (6-8 Zeilen)\n[Chorus]\n[Bridge] (4 Zeilen)\n[Chorus]\n[Verse 3] (6-8 Zeilen)\n[Chorus]\n[Outro] (2-4 Zeilen)\n"
+                        + "Langes Lied, ca. 3:30-4:00 Minuten.";
             default:
                 return "Struktur: [Verse 1], [Chorus], [Verse 2], [Chorus], [Outro].";
         }

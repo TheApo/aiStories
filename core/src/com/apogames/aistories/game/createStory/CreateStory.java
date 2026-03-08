@@ -339,7 +339,9 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
         ChatGPTIO chatGPT = getMainPanel().getListenStory().getChatGPT();
         chatGPT.setLlm(llm);
-        chatGPT.reset();
+        chatGPT.resetWithSystemPrompt("Du bist ein erfahrener Liedtexter, der eingaengige, reimende Liedtexte schreibt. "
+                + "Du kennst den Aufbau von Songs mit Strophen, Refrain, Bridge und Outro. "
+                + "Du schreibst IMMER den vollstaendigen Liedtext mit ALLEN geforderten Abschnitten.");
         chatGPT.sendAnotherMessage(lyricsPrompt);
         // sendMessage() hardcodes CREATE_STORY — override with CREATE_LYRICS
         getMainPanel().getListenStory().setRunning(Running.CREATE_LYRICS);

@@ -76,13 +76,13 @@ public class SongSettings {
 
     public String getAgeDescription() {
         switch (ageGroup) {
-            case AGE_0_1: return "0 bis 1 Jahr";
-            case AGE_2_4: return "2 bis 4 Jahren";
-            case AGE_5_7: return "5 bis 7 Jahren";
-            case AGE_8_12: return "8 bis 12 Jahren";
-            case AGE_12_16: return "12 bis 16 Jahren";
-            case AGE_16_PLUS: return "ab 16 Jahren";
-            default: return "8 bis 12 Jahren";
+            case AGE_0_1: return "Kinder von 0 bis 1 Jahr";
+            case AGE_2_4: return "Kinder von 2 bis 4 Jahren";
+            case AGE_5_7: return "Kinder von 5 bis 7 Jahren";
+            case AGE_8_12: return "Kinder von 8 bis 12 Jahren";
+            case AGE_12_16: return "Jugendliche von 12 bis 16 Jahren";
+            case AGE_16_PLUS: return "Jugendliche und Erwachsene ab 16 Jahren";
+            default: return "Kinder von 8 bis 12 Jahren";
         }
     }
 

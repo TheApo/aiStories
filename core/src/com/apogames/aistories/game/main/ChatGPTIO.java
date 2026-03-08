@@ -276,6 +276,15 @@ public class ChatGPTIO {
         conversationHistory.add(userMessage);
     }
 
+    public void resetWithSystemPrompt(String systemPrompt) {
+        this.conversationHistory.clear();
+
+        Map<String, String> systemMessage = new HashMap<>();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", systemPrompt);
+        conversationHistory.add(systemMessage);
+    }
+
 
 
     /**
