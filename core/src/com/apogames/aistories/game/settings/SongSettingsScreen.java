@@ -266,6 +266,7 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
         }
         if (promptField.isSelect()) {
             promptField.handleNavigationKey(keyCode);
+            updateObjectivesPreview();
         }
     }
 

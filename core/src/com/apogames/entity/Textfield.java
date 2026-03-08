@@ -317,6 +317,9 @@ public class Textfield extends ApoButton {
      * Returns true if the key was handled.
      */
     public boolean handleNavigationKey(int keyCode) {
+        if (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT)) {
+            return handleCtrlKey(keyCode);
+        }
         switch (keyCode) {
             case Input.Keys.LEFT:
                 setPosition(position - 1);
@@ -341,6 +344,47 @@ public class Textfield extends ApoButton {
             case Input.Keys.DOWN:
                 navigateDown();
                 clearSelection();
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private boolean handleCtrlKey(int keyCode) {
+        switch (keyCode) {
+            case Input.Keys.A:
+                this.selectedPosition.x = 0;
+                this.selectedPosition.y = this.curString.length();
+                this.setPosition(this.curString.length());
+                return true;
+            case Input.Keys.C:
+                String selC = this.getSelectedString();
+                if (selC != null && !selC.isEmpty()) {
+                    Gdx.app.getClipboard().setContents(selC);
+                }
+                return true;
+            case Input.Keys.X:
+                String selX = this.getSelectedString();
+                if (selX != null && !selX.isEmpty()) {
+                    Gdx.app.getClipboard().setContents(selX);
+                    this.deleteSelectedString();
+                }
+                return true;
+            case Input.Keys.V:
+                String clip = Gdx.app.getClipboard().getContents();
+                if (clip != null && !clip.isEmpty()) {
+                    String selV = this.getSelectedString();
+                    if (selV != null && !selV.isEmpty()) {
+                        this.deleteSelectedString();
+                    }
+                    if (this.curString.length() + clip.length() <= this.maxLength) {
+                        this.curString = this.curString.substring(0, this.position) + clip + this.curString.substring(this.position);
+                        this.position += clip.length();
+                        this.showLine();
+                        this.selectedPosition.x = -1;
+                        this.selectedPosition.y = -1;
+                    }
+                }
                 return true;
             default:
                 return false;
@@ -525,48 +569,6 @@ public class Textfield extends ApoButton {
 
     public void addTypedCharacter(char character) {
         if (!this.bEnabled || !this.isSelect()) {
-            return;
-        }
-        if (character == 1) {
-            // Ctrl+A: select all
-            this.selectedPosition.x = 0;
-            this.selectedPosition.y = this.curString.length();
-            this.setPosition(this.curString.length());
-            return;
-        }
-        if (character == 3) {
-            // Ctrl+C: copy selection to clipboard
-            String sel = this.getSelectedString();
-            if (sel != null && !sel.isEmpty()) {
-                Gdx.app.getClipboard().setContents(sel);
-            }
-            return;
-        }
-        if (character == 24) {
-            // Ctrl+X: cut selection to clipboard
-            String sel = this.getSelectedString();
-            if (sel != null && !sel.isEmpty()) {
-                Gdx.app.getClipboard().setContents(sel);
-                this.deleteSelectedString();
-            }
-            return;
-        }
-        if (character == 22) {
-            // Ctrl+V: paste from clipboard
-            String clip = Gdx.app.getClipboard().getContents();
-            if (clip != null && !clip.isEmpty()) {
-                String s = this.getSelectedString();
-                if (s != null && !s.isEmpty()) {
-                    this.deleteSelectedString();
-                }
-                if (this.curString.length() + clip.length() <= this.maxLength) {
-                    this.curString = this.curString.substring(0, this.position) + clip + this.curString.substring(this.position);
-                    this.position += clip.length();
-                    this.showLine();
-                    this.selectedPosition.x = -1;
-                    this.selectedPosition.y = -1;
-                }
-            }
             return;
         }
         if (character == 8) {
