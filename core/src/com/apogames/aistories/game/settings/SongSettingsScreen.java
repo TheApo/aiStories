@@ -3,11 +3,13 @@ package com.apogames.aistories.game.settings;
 import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
 import com.apogames.aistories.game.main.SongPrompt;
+import com.apogames.aistories.game.objects.GameObjectives;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
 import com.apogames.common.Localization;
 import com.apogames.entity.ApoButton;
+import com.apogames.entity.ApoButtonCheckIcon;
 import com.apogames.entity.Textfield;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
@@ -44,13 +46,30 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
     private static final int PROMPT_X = 20;
     private static final int PROMPT_Y = SECTION_4_Y + 28;
     private static final int PROMPT_WIDTH = Constants.GAME_WIDTH - 40;
-    private static final int PROMPT_HEIGHT = Constants.GAME_HEIGHT - PROMPT_Y - 110;
-    private static final int SECTION_4_H = 28 + PROMPT_HEIGHT + 8;
+    private static final int PROMPT_HEIGHT = 160;
+    private static final int SECTION_4_H = Constants.GAME_HEIGHT - SECTION_4_Y - 100;
+
+    private static final int OBJ_SECTION_X = SECTION_X + 5;
+    private static final int OBJ_SECTION_Y = PROMPT_Y + PROMPT_HEIGHT + 4;
+    private static final int OBJ_SECTION_W = SECTION_W - 10;
+    private static final int OBJ_SECTION_H = (SECTION_4_Y + SECTION_4_H) - OBJ_SECTION_Y - 5;
+
+    private static final int TOGGLE_SIZE = 48;
+    private static final int TOGGLE_X = OBJ_SECTION_X + 8;
+    private static final int TOGGLE_Y = OBJ_SECTION_Y + 4;
+
+    private static final int OBJ_TITLE_X = TOGGLE_X + TOGGLE_SIZE + 10;
+    private static final int OBJ_TITLE_Y = TOGGLE_Y + 13;
+
+    private static final int OBJ_TEXT_X = OBJ_SECTION_X + 15;
+    private static final int OBJ_TEXT_Y = TOGGLE_Y + TOGGLE_SIZE + 4;
+    private static final int OBJ_LINE_HEIGHT = 21;
 
     private static final int TILE_RADIUS = 5;
 
     private final boolean[] keys = new boolean[256];
     private Textfield promptField;
+    private ApoButtonCheckIcon toggleButton;
     private int hoverStyle = -1;
     private int hoverAge = -1;
     private int hoverLength = -1;
@@ -58,6 +77,8 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
     private SongSettings.MusicStyle selectedStyle;
     private StorySettings.AgeGroup selectedAge;
     private SongSettings.SongLength selectedLength;
+    private String objectivesPreview = "";
+    private int totalPromptLength = 0;
 
     private static final GlyphLayout glyphLayout = new GlyphLayout();
 
@@ -72,24 +93,60 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
         this.selectedAge = settings.getAgeGroup();
         this.selectedLength = settings.getSongLength();
 
+        if (this.toggleButton == null) {
+            this.toggleButton = new ApoButtonCheckIcon(TOGGLE_X, TOGGLE_Y, TOGGLE_SIZE,
+                    "TOGGLE_OBJECTIVES", Constants.COLOR_SIDE_CHARACTER, Constants.COLOR_BLACK);
+        }
+        this.toggleButton.setChecked(settings.isIncludeObjectives());
+
         if (this.promptField == null) {
             this.promptField = new Textfield(PROMPT_X, PROMPT_Y, PROMPT_WIDTH, PROMPT_HEIGHT, AssetLoader.font25);
             this.promptField.init();
-            this.promptField.setMaxLength(3000);
+            this.promptField.setMaxLength(500);
             this.promptField.setMultiLine(true);
             this.promptField.setFixedFont(true);
             this.promptField.setCurString("");
         }
 
-        String template = settings.getPromptTemplate();
-        if (template == null || template.isEmpty()) {
-            template = SongPrompt.buildPromptTemplate(settings);
+        String header = settings.getPromptTemplate();
+        if (header == null || header.isEmpty()) {
+            header = SongPrompt.buildCompactTemplate(settings);
         }
-        this.promptField.setCurString(template);
+        this.promptField.setCurString(header);
         this.promptField.setSelect(false);
+
+        updateObjectivesPreview();
 
         getMainPanel().resetSize(Constants.GAME_WIDTH, Constants.GAME_HEIGHT);
         this.setNeededButtonsVisible();
+    }
+
+    private void updateObjectivesPreview() {
+        String header = promptField.getCurString();
+        GameObjectives objectives = getMainPanel().getPromptObject().getGameObjectives();
+
+        if (toggleButton.isChecked()) {
+            // Build temp settings with current selections to compute the actual Suno prompt
+            SongSettings tempSettings = new SongSettings();
+            tempSettings.setMusicStyle(selectedStyle);
+            tempSettings.setAgeGroup(selectedAge);
+            tempSettings.setSongLength(selectedLength);
+            tempSettings.setPromptTemplate(header);
+            tempSettings.setIncludeObjectives(true);
+
+            String fullPrompt = SongPrompt.buildSunoPrompt(tempSettings, objectives);
+            this.totalPromptLength = fullPrompt.length();
+
+            // Extract objectives portion (everything after the header)
+            if (fullPrompt.length() > header.length()) {
+                this.objectivesPreview = fullPrompt.substring(header.length());
+            } else {
+                this.objectivesPreview = "";
+            }
+        } else {
+            this.objectivesPreview = "";
+            this.totalPromptLength = header.length();
+        }
     }
 
     @Override
@@ -118,6 +175,7 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
         settings.setAgeGroup(selectedAge);
         settings.setSongLength(selectedLength);
         settings.setPromptTemplate(promptField.getCurString());
+        settings.setIncludeObjectives(toggleButton.isChecked());
         settings.save();
     }
 
@@ -126,8 +184,9 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
         tempSettings.setMusicStyle(selectedStyle);
         tempSettings.setAgeGroup(selectedAge);
         tempSettings.setSongLength(selectedLength);
-        String template = SongPrompt.buildPromptTemplate(tempSettings);
-        promptField.setCurString(template);
+        String header = SongPrompt.buildCompactTemplate(tempSettings);
+        promptField.setCurString(header);
+        updateObjectivesPreview();
     }
 
     @Override
@@ -137,6 +196,13 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
             return;
         }
         promptField.setSelect(false);
+
+        // Toggle objectives button
+        if (toggleButton.intersects(x, y)) {
+            toggleButton.toggle();
+            updateObjectivesPreview();
+            return;
+        }
 
         int styleIndex = getTileIndex(x, y, ROW_Y_STYLE, SongSettings.MusicStyle.values().length, getStyleTileWidth());
         if (styleIndex >= 0) {
@@ -170,6 +236,7 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
     @Override
     public void mouseMoved(int x, int y) {
         promptField.getMove(x, y);
+        toggleButton.setBOver(toggleButton.intersects(x, y));
         hoverStyle = getTileIndex(x, y, ROW_Y_STYLE, SongSettings.MusicStyle.values().length, getStyleTileWidth());
         hoverAge = getTileIndex(x, y, ROW_Y_AGE, StorySettings.AgeGroup.values().length, getAgeTileWidth());
         hoverLength = getTileIndex(x, y, ROW_Y_LENGTH, SongSettings.SongLength.values().length, getLengthTileWidth());
@@ -183,13 +250,17 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
 
     @Override
     public void keyButtonReleased(int keyCode, char character) {
-        super.keyButtonReleased(keyCode, character);
+        // keyTyped events: keys[keyCode] is false because keyDown used a different code
+        // Must NOT call super here — 'o' has ASCII 111 = Input.Keys.ESCAPE, would trigger quit()
         if (keyCode >= 0 && keyCode < keys.length && !keys[keyCode]) {
             if (promptField.isSelect()) {
                 promptField.addTypedCharacter(character);
+                updateObjectivesPreview();
             }
             return;
         }
+        // keyUp events: call super (handles Escape/Back exit) and navigation
+        super.keyButtonReleased(keyCode, character);
         if (keyCode >= 0 && keyCode < keys.length) {
             keys[keyCode] = false;
         }
@@ -248,6 +319,8 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
         getMainPanel().getRenderer().roundedRect(SECTION_X, SECTION_2_Y, SECTION_W, SECTION_2_H, 10);
         getMainPanel().getRenderer().roundedRect(SECTION_X, SECTION_3_Y, SECTION_W, SECTION_3_H, 10);
         getMainPanel().getRenderer().roundedRect(SECTION_X, SECTION_4_Y, SECTION_W, SECTION_4_H, 10);
+        getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.3f);
+        getMainPanel().getRenderer().roundedRect(OBJ_SECTION_X, OBJ_SECTION_Y, OBJ_SECTION_W, OBJ_SECTION_H, 8);
         getMainPanel().getRenderer().end();
 
         renderTileRow(ROW_Y_STYLE, SongSettings.MusicStyle.values().length, getStyleTileWidth(),
@@ -275,6 +348,41 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
         getMainPanel().spriteBatch.end();
 
         promptField.render(getMainPanel(), 0, 0);
+        toggleButton.render(getMainPanel(), 0, 0);
+
+        getMainPanel().spriteBatch.begin();
+
+        // Section title next to toggle
+        String objTitle = Localization.getInstance().getCommon().get("song_objectives_title");
+        getMainPanel().drawString(objTitle, OBJ_TITLE_X, OBJ_TITLE_Y, Constants.COLOR_WHITE,
+                AssetLoader.font20, DrawString.BEGIN, false, false);
+
+        // Character counter — right-aligned, same row as title
+        float[] counterColor = totalPromptLength > 500 ? Constants.COLOR_RED : Constants.COLOR_WHITE;
+        String counter = totalPromptLength + " / 500";
+        getMainPanel().drawString(counter, OBJ_SECTION_X + OBJ_SECTION_W - 10, OBJ_TITLE_Y,
+                counterColor, AssetLoader.font20, DrawString.END, false, false);
+
+        // Objectives text or OFF message
+        if (toggleButton.isChecked()) {
+            if (!objectivesPreview.isEmpty()) {
+                String[] lines = objectivesPreview.split("\n");
+                int lineY = OBJ_TEXT_Y;
+                for (String line : lines) {
+                    if (!line.trim().isEmpty()) {
+                        getMainPanel().drawString(line.trim(), OBJ_TEXT_X, lineY, Constants.COLOR_WHITE,
+                                AssetLoader.font20, DrawString.BEGIN, false, false);
+                        lineY += OBJ_LINE_HEIGHT;
+                    }
+                }
+            }
+        } else {
+            String offMsg = Localization.getInstance().getCommon().get("song_objectives_off");
+            getMainPanel().drawString(offMsg, OBJ_TEXT_X, OBJ_TEXT_Y, Constants.COLOR_GREY_BRIGHT,
+                    AssetLoader.font20, DrawString.BEGIN, false, false);
+        }
+
+        getMainPanel().spriteBatch.end();
 
         for (ApoButton button : getMainPanel().getButtons()) {
             button.render(getMainPanel());
@@ -324,7 +432,7 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
         SongSettings.MusicStyle[] values = SongSettings.MusicStyle.values();
         String[] labels = new String[values.length];
         String[] keys = {"music_pop", "music_rock", "music_country", "music_hiphop",
-                "music_lullaby", "music_folk", "music_electronic", "music_musical"};
+                "music_lullaby", "music_piano", "music_electronic", "music_musical"};
         for (int i = 0; i < values.length; i++) {
             labels[i] = Localization.getInstance().getCommon().get(keys[i]);
         }

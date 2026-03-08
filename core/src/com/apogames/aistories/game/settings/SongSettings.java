@@ -12,7 +12,7 @@ public class SongSettings {
     private static final String PREFS_NAME = "AIStoriesSongSettings";
 
     public enum MusicStyle {
-        POP, ROCK, COUNTRY, HIPHOP, LULLABY, FOLK, ELECTRONIC, MUSICAL
+        POP, ROCK, COUNTRY, HIPHOP, LULLABY, PIANO, ELECTRONIC, MUSICAL
     }
 
     public enum SongLength {
@@ -30,6 +30,7 @@ public class SongSettings {
     private StorySettings.AgeGroup ageGroup = StorySettings.AgeGroup.AGE_8_12;
     private SongLength songLength = SongLength.MEDIUM;
     private String promptTemplate = "";
+    private boolean includeObjectives = true;
 
     public void save() {
         Preferences prefs = Gdx.app.getPreferences(PREFS_NAME);
@@ -37,6 +38,7 @@ public class SongSettings {
         prefs.putString("ageGroup", ageGroup.name());
         prefs.putString("songLength", songLength.name());
         prefs.putString("promptTemplate", promptTemplate);
+        prefs.putBoolean("includeObjectives", includeObjectives);
         prefs.flush();
     }
 
@@ -58,6 +60,7 @@ public class SongSettings {
             songLength = SongLength.MEDIUM;
         }
         promptTemplate = prefs.getString("promptTemplate", "");
+        includeObjectives = prefs.getBoolean("includeObjectives", true);
     }
 
     public String getAgeDescription() {

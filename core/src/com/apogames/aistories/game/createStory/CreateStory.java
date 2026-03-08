@@ -198,6 +198,7 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
                 break;
             case CreateStory.FUNCTION_SETTINGS:
                 if (getMainPanel().isSongMode()) {
+                    applySelectedObjectives();
                     getMainPanel().changeToSongSettings();
                 } else {
                     getMainPanel().changeToStorySettings();

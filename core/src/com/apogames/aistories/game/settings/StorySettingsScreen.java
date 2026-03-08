@@ -192,13 +192,13 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
 
     @Override
     public void keyButtonReleased(int keyCode, char character) {
-        super.keyButtonReleased(keyCode, character);
         if (keyCode >= 0 && keyCode < keys.length && !keys[keyCode]) {
             if (promptField.isSelect()) {
                 promptField.addTypedCharacter(character);
             }
             return;
         }
+        super.keyButtonReleased(keyCode, character);
         if (keyCode >= 0 && keyCode < keys.length) {
             keys[keyCode] = false;
         }

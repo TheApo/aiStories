@@ -53,84 +53,101 @@ public class SongPrompt {
         return sb.toString();
     }
 
-    /**
-     * Compact prompt for Suno API (max 490 chars, non-custom mode limit is 500).
-     */
-    private static final int SUNO_MAX = 490;
-
-    public static String buildSunoPrompt(SongSettings settings, GameObjectives objectives) {
-        String header = getCompactStyle(settings.getMusicStyle())
+    public static String buildCompactTemplate(SongSettings settings) {
+        return getCompactStyle(settings.getMusicStyle())
+                + " (" + settings.getSongLength().getLabel() + ")"
                 + " fuer " + settings.getAgeDescription() + ". "
                 + getCompactAgeTone(settings.getAgeGroup()) + " "
                 + getCompactStructure(settings.getAgeGroup()) + " "
                 + "Text muss sich reimen (AABB), eingaengig und singbar sein.";
-
-        // Collect active elements
-        String[][] elements = collectElements(objectives);
-
-        // Step 1: Try full prompt with all details
-        String full = buildWithDetails(header, elements, Integer.MAX_VALUE);
-        if (full.length() <= SUNO_MAX) {
-            return full;
-        }
-
-        // Step 2: Distribute remaining space for shortened details
-        String namesOnly = buildWithDetails(header, elements, 0);
-        int remaining = SUNO_MAX - namesOnly.length();
-        if (remaining > 0 && elements.length > 0) {
-            int perElement = remaining / elements.length;
-            if (perElement >= 20) {
-                String shortened = buildWithDetails(header, elements, perElement);
-                if (shortened.length() <= SUNO_MAX) {
-                    return shortened;
-                }
-            }
-        }
-
-        // Step 3: Names only, no details
-        if (namesOnly.length() <= SUNO_MAX) {
-            return namesOnly;
-        }
-
-        // Step 4: Fallback truncate
-        return namesOnly.substring(0, SUNO_MAX);
     }
 
-    private static String[][] collectElements(GameObjectives objectives) {
-        String[][] pairs = new String[5][];
-        int count = 0;
-        if (objectives.getMainCharacter() != null) pairs[count++] = new String[]{"Hauptfigur", objectives.getMainCharacter().getDisplayName(), objectives.getMainCharacter().getDisplayDetails()};
-        if (objectives.getSupportingCharacter() != null) pairs[count++] = new String[]{"Nebenfigur", objectives.getSupportingCharacter().getDisplayName(), objectives.getSupportingCharacter().getDisplayDetails()};
-        if (objectives.getUniverse() != null) pairs[count++] = new String[]{"Welt", objectives.getUniverse().getDisplayName(), objectives.getUniverse().getDisplayDetails()};
-        if (objectives.getPlaces() != null) pairs[count++] = new String[]{"Ort", objectives.getPlaces().getDisplayName(), objectives.getPlaces().getDisplayDetails()};
-        if (objectives.getObjectives() != null) pairs[count++] = new String[]{"Objekt", objectives.getObjectives().getDisplayName(), objectives.getObjectives().getDisplayDetails()};
-        String[][] result = new String[count][];
-        System.arraycopy(pairs, 0, result, 0, count);
-        return result;
-    }
-
-    private static String buildWithDetails(String header, String[][] elements, int maxDetailLen) {
-        StringBuilder sb = new StringBuilder(header);
+    public static String buildObjectivesText(GameObjectives objectives) {
+        String[][] elements = collectElementsFixed(objectives);
+        StringBuilder sb = new StringBuilder();
         for (String[] el : elements) {
-            sb.append("\n").append(el[0]).append(": ").append(el[1]);
-            if (maxDetailLen > 0 && el[2] != null && !el[2].isEmpty()) {
-                String details = el[2];
-                if (details.length() > maxDetailLen) {
-                    details = truncateAtWord(details, maxDetailLen);
-                }
-                if (!details.isEmpty()) {
-                    sb.append(" (").append(details).append(")");
+            if (el != null) {
+                sb.append("\n").append(el[0]).append(": ").append(el[1]);
+                if (el[2] != null && !el[2].isEmpty()) {
+                    sb.append(" (").append(el[2]).append(")");
                 }
             }
         }
         return sb.toString();
     }
 
-    private static String truncateAtWord(String text, int maxLen) {
-        if (text.length() <= maxLen) return text;
-        int cut = text.lastIndexOf(' ', maxLen);
-        if (cut <= 0) cut = maxLen;
-        return text.substring(0, cut);
+    private static final int SUNO_MAX = 500;
+
+    // Detail removal order: Universe(2) → Places(3) → SupportingCharacter(1) → Objectives(4) → MainCharacter(0)
+    private static final int[] DETAIL_REMOVAL_ORDER = {2, 3, 1, 4, 0};
+
+    public static String buildSunoPrompt(SongSettings settings, GameObjectives objectives) {
+        String template = settings.getPromptTemplate();
+        String header;
+        if (template != null && !template.isEmpty()) {
+            header = template;
+        } else {
+            header = buildCompactTemplate(settings);
+        }
+
+        if (!settings.isIncludeObjectives()) {
+            return header.length() <= SUNO_MAX ? header : header.substring(0, SUNO_MAX);
+        }
+
+        String[][] elements = collectElementsFixed(objectives);
+        boolean[] includeDetails = new boolean[5];
+        for (int i = 0; i < 5; i++) {
+            includeDetails[i] = true;
+        }
+
+        // Step 1: Try with all details
+        String prompt = buildWithFlags(header, elements, includeDetails);
+        if (prompt.length() <= SUNO_MAX) {
+            return prompt;
+        }
+
+        // Step 2: Remove details one by one in order: Universe → Places → Nebenfigur → Objekt → Hauptfigur
+        for (int idx : DETAIL_REMOVAL_ORDER) {
+            if (elements[idx] != null) {
+                includeDetails[idx] = false;
+                prompt = buildWithFlags(header, elements, includeDetails);
+                if (prompt.length() <= SUNO_MAX) {
+                    return prompt;
+                }
+            }
+        }
+
+        // Step 3: Names only still too long → no objectives, just header
+        return header.length() <= SUNO_MAX ? header : header.substring(0, SUNO_MAX);
+    }
+
+    // Fixed positions: 0=MainCharacter, 1=SupportingCharacter, 2=Universe, 3=Places, 4=Objectives
+    private static String[][] collectElementsFixed(GameObjectives objectives) {
+        String[][] pairs = new String[5][];
+        if (objectives.getMainCharacter() != null)
+            pairs[0] = new String[]{"Hauptfigur", objectives.getMainCharacter().getDisplayName(), objectives.getMainCharacter().getDisplayDetails()};
+        if (objectives.getSupportingCharacter() != null)
+            pairs[1] = new String[]{"Nebenfigur", objectives.getSupportingCharacter().getDisplayName(), objectives.getSupportingCharacter().getDisplayDetails()};
+        if (objectives.getUniverse() != null)
+            pairs[2] = new String[]{"Welt", objectives.getUniverse().getDisplayName(), objectives.getUniverse().getDisplayDetails()};
+        if (objectives.getPlaces() != null)
+            pairs[3] = new String[]{"Ort", objectives.getPlaces().getDisplayName(), objectives.getPlaces().getDisplayDetails()};
+        if (objectives.getObjectives() != null)
+            pairs[4] = new String[]{"Objekt", objectives.getObjectives().getDisplayName(), objectives.getObjectives().getDisplayDetails()};
+        return pairs;
+    }
+
+    private static String buildWithFlags(String header, String[][] elements, boolean[] includeDetails) {
+        StringBuilder sb = new StringBuilder(header);
+        for (int i = 0; i < elements.length; i++) {
+            if (elements[i] != null) {
+                sb.append("\n").append(elements[i][0]).append(": ").append(elements[i][1]);
+                if (includeDetails[i] && elements[i][2] != null && !elements[i][2].isEmpty()) {
+                    sb.append(" (").append(elements[i][2]).append(")");
+                }
+            }
+        }
+        return sb.toString();
     }
 
     private static String getCompactStyle(SongSettings.MusicStyle style) {
@@ -140,7 +157,7 @@ public class SongPrompt {
             case COUNTRY: return "Warmes Country-Lied";
             case HIPHOP: return "Rhythmisches HipHop-Lied";
             case LULLABY: return "Sanftes Schlaflied";
-            case FOLK: return "Akustisches Folk-Lied";
+            case PIANO: return "Ruhiges emotionales Piano-Lied";
             case ELECTRONIC: return "Tanzbares Electronic-Lied";
             case MUSICAL: return "Dramatisches Musical-Lied";
             default: return "Eingaengiges Pop-Lied";
@@ -183,8 +200,8 @@ public class SongPrompt {
                 return "HipHop — rhythmischer Sprechgesang, wortgewandt und kreativ, mit cleverem Wortspiel, fliessenden Reimen und einem eingaengigen Hook";
             case LULLABY:
                 return "Schlaflied/Wiegenlied — sanft, beruhigend, langsames Tempo, weiche Melodie, wiederholende Muster die zum Einschlafen einladen";
-            case FOLK:
-                return "Folk — akustisch, natuerlich, mit erzaehlerischem Charakter, Gemeinschaftsgefuehl und einem zeitlosen Klang zum Mitsingen";
+            case PIANO:
+                return "Piano — ruhig, emotional, sanfte Klaviermelodie, gefuehlvoll und introspektiv, mit zartem Ausdruck und beruhigender Atmosphaere";
             case ELECTRONIC:
                 return "Electronic/Dance — moderner, tanzbarer Beat, synthetische Klaenge, repetitiver eingaengiger Refrain der zum Bewegen einlaedt";
             case MUSICAL:

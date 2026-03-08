@@ -514,14 +514,21 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
 
             getMainPanel().saveCustomEntityPreferences();
         }
-        hideKeyboardIfAndroid();
-        getMainPanel().changeToCreateStory();
+        goBack();
     }
 
     @Override
     protected void quit() {
+        goBack();
+    }
+
+    private void goBack() {
         hideKeyboardIfAndroid();
-        getMainPanel().changeToCreateStory();
+        if (getMainPanel().isSongMode()) {
+            getMainPanel().changeToCreateSong();
+        } else {
+            getMainPanel().changeToCreateStory();
+        }
     }
 
     @Override
