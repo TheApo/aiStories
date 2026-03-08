@@ -60,6 +60,12 @@ public class Textfield extends ApoButton {
         this.bCorrectString = true;
     }
 
+    @Override
+    public void setSelect(boolean bSelect) {
+        super.setSelect(bSelect);
+        Gdx.input.setOnscreenKeyboardVisible(bSelect);
+    }
+
     public boolean isCorrectString() {
         return bCorrectString;
     }

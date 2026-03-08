@@ -233,7 +233,6 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
             this.detailsField.setSelect(false);
             this.imagePromptField.setSelect(false);
             this.activeField = this.nameField;
-            showKeyboardIfAndroid();
             return;
         }
         if (this.detailsField.mousePressed(x, y)) {
@@ -241,7 +240,6 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
             this.nameField.setSelect(false);
             this.imagePromptField.setSelect(false);
             this.activeField = this.detailsField;
-            showKeyboardIfAndroid();
             return;
         }
         if (currentMode == Mode.GENERATE && this.imagePromptField.mousePressed(x, y)) {
@@ -249,7 +247,6 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
             this.nameField.setSelect(false);
             this.detailsField.setSelect(false);
             this.activeField = this.imagePromptField;
-            showKeyboardIfAndroid();
             return;
         }
 
@@ -271,7 +268,6 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         this.detailsField.setSelect(false);
         this.imagePromptField.setSelect(false);
         this.activeField = null;
-        hideKeyboardIfAndroid();
     }
 
     @Override
@@ -315,17 +311,6 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         return customEntity != null ? customEntity.getCustomImageCount() : 0;
     }
 
-    private void showKeyboardIfAndroid() {
-        if (Constants.IS_ANDROID) {
-            Gdx.input.setOnscreenKeyboardVisible(true);
-        }
-    }
-
-    private void hideKeyboardIfAndroid() {
-        if (Constants.IS_ANDROID) {
-            Gdx.input.setOnscreenKeyboardVisible(false);
-        }
-    }
 
     private int getGridIndexAt(int mouseX, int mouseY) {
         int relX = mouseX - GRID_START_X;
@@ -523,7 +508,9 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     }
 
     private void goBack() {
-        hideKeyboardIfAndroid();
+        this.nameField.setSelect(false);
+        this.detailsField.setSelect(false);
+        this.imagePromptField.setSelect(false);
         if (getMainPanel().isSongMode()) {
             getMainPanel().changeToCreateSong();
         } else {
@@ -815,6 +802,8 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
 
     @Override
     public void dispose() {
-        hideKeyboardIfAndroid();
+        this.nameField.setSelect(false);
+        this.detailsField.setSelect(false);
+        this.imagePromptField.setSelect(false);
     }
 }

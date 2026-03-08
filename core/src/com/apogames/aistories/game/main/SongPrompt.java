@@ -89,10 +89,13 @@ public class SongPrompt {
         sb.append(ageTone).append("\n\n");
         sb.append(lengthStructure).append("\n\n");
 
-        sb.append("WICHTIG: Formatiere den Text mit folgenden Struktur-Tags auf eigener Zeile:\n");
-        sb.append("[Intro], [Verse 1], [Verse 2], [Verse 3], [Chorus], [Bridge], [Outro]\n");
-        sb.append("Jeder Abschnitt beginnt mit dem passenden Tag. ");
+        sb.append("WICHTIG: Halte dich EXAKT an die oben angegebene Struktur und Reihenfolge. ");
+        sb.append("Nicht mehr und nicht weniger Abschnitte als angegeben. ");
+        sb.append("Der [Chorus] hat immer den gleichen Text und wird nach jeder Strophe wiederholt. ");
+        sb.append("Formatiere jeden Abschnitt mit dem passenden Tag auf eigener Zeile.\n");
         sb.append("Der Text muss sich reimen (AABB Schema), eingaengig und singbar sein.\n");
+        sb.append("Jede Zeile muss kurz und singbar sein: maximal 6-10 Silben bzw. 4-8 Woerter pro Zeile. ");
+        sb.append("Keine langen Schachtelsaetze. Schreibe so, wie man es natuerlich singen wuerde.\n");
         sb.append("Schreibe KEINE Reimschema-Markierungen wie (A), (B) oder aehnliches hinter die Zeilen.\n\n");
 
         sb.append("Gib NUR den Liedtext aus, keine Erklaerungen oder Kommentare.\n\n");
@@ -135,13 +138,13 @@ public class SongPrompt {
     private static String getLyricsStructure(SongSettings.SongLength length) {
         switch (length) {
             case SHORT:
-                return "Struktur: Kurzes Lied mit [Verse 1], [Chorus], [Verse 2], [Chorus]. Maximal 2 Strophen und 2 Refrains.";
+                return "Struktur (EXAKT einhalten): [Verse 1], [Chorus], [Chorus], [Outro]. Nur 1 Strophe, 2x Chorus, kurzes Outro.";
             case MEDIUM:
-                return "Struktur: Mittellanges Lied mit [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Chorus]. 2-3 Strophen, 2-3 Refrains und eine Bridge.";
+                return "Struktur (EXAKT einhalten): [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Outro]. 2 Strophen, nach jeder Strophe ein Chorus, dann Bridge und Outro.";
             case LONG:
-                return "Struktur: Langes Lied mit [Intro], [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Verse 3], [Chorus], [Outro]. 3 Strophen, 3 Refrains, Bridge und optional Intro/Outro.";
+                return "Struktur (EXAKT einhalten): [Intro], [Verse 1], [Chorus], [Verse 2], [Chorus], [Bridge], [Chorus], [Verse 3], [Chorus], [Outro]. Intro, 3 Strophen mit Chorus nach jeder, Bridge mit anschliessendem Chorus, Outro.";
             default:
-                return "Struktur: 2-3 Strophen, 2-3 Refrains, optional Bridge.";
+                return "Struktur: [Verse 1], [Chorus], [Verse 2], [Chorus], [Outro].";
         }
     }
 
