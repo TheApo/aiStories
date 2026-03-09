@@ -17,6 +17,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.Input;
 import lombok.Getter;
 
 import com.mpatric.mp3agic.Mp3File;
@@ -73,6 +74,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private boolean pendingSunoReady = false;
     private String pendingSunoStyle = "";
     private String pendingSunoHeader = "";
+    private String savedSongFilePrefix = "";
 
     private FontSize fontSize = FontSize.FONT_25;
 
@@ -88,6 +90,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private final BookRenderer bookRenderer;
     private final PageTurnAnimation pageAnimation = new PageTurnAnimation();
+    private final BookTextEditor textEditor = new BookTextEditor();
+    private String fileMetadataPrefix = "";
 
     private static final int ROW1_Y_NORMAL = 580;
     private static final int ROW2_Y = 700;
@@ -208,8 +212,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void setTextInTextArea(String text) {
         this.isSong = false;
+        this.fileMetadataPrefix = "";
         if (text.contains(SEPARATOR_IN_FILE)) {
             String values = text.substring(0,text.indexOf(SEPARATOR_IN_FILE));
+            this.fileMetadataPrefix = values + SEPARATOR_IN_FILE;
 
             if (values.startsWith("song")) {
                 this.isSong = true;
@@ -221,6 +227,11 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                     go.setUniverse(resolveEntity(songParts[3], go.getUniverse(), this.getMainPanel().getCustomUniverse(), Universe.values()[0]));
                     go.setPlaces(resolveEntity(songParts[4], go.getPlaces(), this.getMainPanel().getCustomPlaces(), Places.values()[0]));
                     go.setObjectives(resolveEntity(songParts[5], go.getObjectives(), this.getMainPanel().getCustomObjectives(), Objectives.values()[0]));
+                }
+                if (songParts.length >= 7) {
+                    this.pendingSunoStyle = songParts[6];
+                } else {
+                    this.pendingSunoStyle = "";
                 }
                 text = text.substring(text.indexOf(SEPARATOR_IN_FILE) + SEPARATOR_IN_FILE.length());
             } else {
@@ -237,9 +248,169 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         }
         this.currentSpread = 0;
         this.pendingSpread = 0;
-        this.textArea.setText(cleanText(text));
-        processAndLayoutChapters();
+        String cleaned = cleanText(text);
+        this.textArea.setText(cleaned);
+        this.textEditor.setText(cleaned);
+        this.textEditor.setFont(this.fontSize.getFont());
+
+        boolean editable = isEditable();
+        if (editable) {
+            buildEditableLayout();
+        } else {
+            processAndLayoutChapters();
+            this.textEditor.setDisplayData(this.textArea.getMyText(), new int[0], new java.util.HashSet<>());
+        }
+        this.textEditor.setActive(editable);
         updatePageButtonVisibility();
+    }
+
+    private void buildEditableLayout() {
+        bookRenderer.getChapterLines().clear();
+        ArrayList<String> bodyLines = this.textArea.getMyText();
+        String rawText = this.textEditor.getRawText();
+        com.badlogic.gdx.graphics.g2d.BitmapFont headingFont = this.fontSize.getNext(1).getFont();
+        float maxWidth = BookRenderer.TEXT_WIDTH;
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+
+        // Step 1: compute raw text positions for body-font-wrapped lines
+        int[] bodyStarts = new int[bodyLines.size()];
+        int rawPos = 0;
+        for (int i = 0; i < bodyLines.size(); i++) {
+            bodyStarts[i] = rawPos;
+            String line = bodyLines.get(i);
+            if (line.isEmpty()) {
+                if (rawPos < rawText.length() && rawText.charAt(rawPos) == '\n') rawPos++;
+            } else {
+                rawPos += line.length();
+                if (rawPos < rawText.length()) {
+                    char c = rawText.charAt(rawPos);
+                    if (c == ' ' || c == '\n') rawPos++;
+                }
+            }
+        }
+
+        // Step 2: build final display lines with heading re-wrap + page padding
+        ArrayList<String> finalLines = new ArrayList<>();
+        java.util.List<Integer> finalStarts = new ArrayList<>();
+        java.util.Set<Integer> paddingSet = new java.util.HashSet<>();
+
+        int i = 0;
+        while (i < bodyLines.size()) {
+            String line = bodyLines.get(i);
+
+            if (!BookRenderer.isChapterHeading(line)) {
+                finalLines.add(line);
+                finalStarts.add(bodyStarts[i]);
+                i++;
+                continue;
+            }
+
+            // Collect full heading text (may span multiple body-wrapped lines)
+            StringBuilder fullHeading = new StringBuilder(line.trim());
+            int headingRawStart = bodyStarts[i];
+            int lastIdx = i;
+            for (int j = i + 1; j < bodyLines.size(); j++) {
+                String next = bodyLines.get(j).trim();
+                if (next.isEmpty() || BookRenderer.isChapterHeading(next)) break;
+                fullHeading.append(" ").append(next);
+                lastIdx = j;
+            }
+
+            // Page padding: push chapter to next page boundary
+            int currentSize = finalLines.size();
+            int posInPage = currentSize % rowsPerPage;
+            if (posInPage != 0) {
+                int pageStart = currentSize - posInPage;
+                boolean allEmpty = true;
+                for (int j = pageStart; j < currentSize; j++) {
+                    if (!finalLines.get(j).trim().isEmpty() && !paddingSet.contains(j)) {
+                        allEmpty = false;
+                        break;
+                    }
+                }
+                if (allEmpty) {
+                    while (finalLines.size() > pageStart) {
+                        int removeIdx = finalLines.size() - 1;
+                        finalLines.remove(removeIdx);
+                        finalStarts.remove(removeIdx);
+                        paddingSet.remove(removeIdx);
+                    }
+                } else {
+                    int padding = rowsPerPage - posInPage;
+                    for (int p = 0; p < padding; p++) {
+                        paddingSet.add(finalLines.size());
+                        finalLines.add("");
+                        finalStarts.add(headingRawStart);
+                    }
+                }
+            }
+
+            // Re-wrap heading with heading font
+            ArrayList<String> wrapped = wrapTextForFont(fullHeading.toString(), headingFont, maxWidth);
+            int rp = headingRawStart;
+            for (String wLine : wrapped) {
+                bookRenderer.getChapterLines().add(finalLines.size());
+                finalLines.add(wLine);
+                finalStarts.add(rp);
+                rp += wLine.length();
+                if (rp < rawText.length() && rawText.charAt(rp) == ' ') rp++;
+            }
+
+            // Ensure 1 empty line after heading
+            int nextIdx = lastIdx + 1;
+            int emptyCount = 0;
+            while (nextIdx + emptyCount < bodyLines.size() && bodyLines.get(nextIdx + emptyCount).trim().isEmpty()) {
+                emptyCount++;
+            }
+            if (nextIdx < bodyLines.size()) {
+                finalLines.add("");
+                finalStarts.add(bodyStarts[Math.min(nextIdx, bodyLines.size() - 1)]);
+            } else {
+                finalLines.add("");
+                finalStarts.add(rawText.length());
+            }
+
+            i = nextIdx + Math.max(emptyCount, 1);
+            if (i > bodyLines.size()) i = bodyLines.size();
+        }
+
+        int[] startsArray = new int[finalStarts.size()];
+        for (int s = 0; s < finalStarts.size(); s++) startsArray[s] = finalStarts.get(s);
+        this.textEditor.setDisplayData(finalLines, startsArray, paddingSet);
+    }
+
+    private void relayoutAfterEdit() {
+        String rawText = this.textEditor.getRawText();
+        this.textArea.setText(rawText);
+        buildEditableLayout();
+        updatePageButtonVisibility();
+
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        int neededSpread = this.textEditor.getSpreadForCursor(rowsPerPage);
+        if (neededSpread != this.currentSpread && !pageAnimation.isAnimating()) {
+            this.pendingSpread = neededSpread;
+            if (neededSpread > this.currentSpread) {
+                pageAnimation.start(PageTurnAnimation.Direction.FORWARD);
+            } else {
+                pageAnimation.start(PageTurnAnimation.Direction.BACKWARD);
+            }
+            Gdx.graphics.setContinuousRendering(true);
+        }
+        Gdx.graphics.requestRendering();
+    }
+
+    private ArrayList<String> getActiveDisplayLines() {
+        if (this.textEditor.isActive() && !this.textEditor.getDisplayLines().isEmpty()) {
+            return new ArrayList<>(this.textEditor.getDisplayLines());
+        }
+        return this.textArea.getMyText();
+    }
+
+    private void saveEditedText() {
+        if (this.choosenReadStory < 0) return;
+        String rawText = this.textEditor.getRawText();
+        FileHandle fileHandle = this.fileTXTHandles[this.choosenReadStory];
+        fileHandle.writeString(this.fileMetadataPrefix + rawText, false);
     }
 
     private String cleanText(String text) {
@@ -376,10 +547,11 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private void updatePageButtonVisibility() {
-        if (this.textArea == null || this.textArea.getMyText() == null) return;
+        ArrayList<String> lines = getActiveDisplayLines();
+        if (lines == null || lines.isEmpty()) return;
         int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
         boolean canGoBack = this.currentSpread > 0;
-        boolean canGoForward = (this.currentSpread + 1) * 2 * rowsPerPage < this.textArea.getMyText().size();
+        boolean canGoForward = (this.currentSpread + 1) * 2 * rowsPerPage < lines.size();
         getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_PAGE).setVisible(canGoBack);
         getMainPanel().getButtonByFunction(FUNCTION_NEXT_PAGE).setVisible(canGoForward);
     }
@@ -391,6 +563,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         boolean hasElevenLabs = ElvenlabIO.API_KEY != null && !ElvenlabIO.API_KEY.isEmpty()
                 && !ElvenlabIO.API_KEY.equals("Dein ELEVENLABS_API_KEY");
         return hasMp3 || hasSongVariants || hasElevenLabs;
+    }
+
+    private boolean isEditable() {
+        boolean hasMp3 = this.choosenListenStory >= 0;
+        boolean hasSongVariants = this.songVariantHandles != null && this.songVariantHandles.length > 0;
+        return !hasMp3 && !hasSongVariants && this.choosenReadStory >= 0 && this.running == Running.NONE;
     }
 
     private void updateAudioButtonVisibility() {
@@ -603,18 +781,90 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         fileHandle.writeString(ids+text, false);
     }
 
+    private void saveSongText(String text) {
+        GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
+        String header = "song;" + safeGetName(go.getMainCharacter()) + ";"
+                + safeGetName(go.getSupportingCharacter()) + ";"
+                + safeGetName(go.getUniverse()) + ";"
+                + safeGetName(go.getPlaces()) + ";"
+                + safeGetName(go.getObjectives()) + ";"
+                + this.pendingSunoStyle + SEPARATOR_IN_FILE;
+
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_");
+        String formattedDate = now.format(fmt);
+
+        String main = go.getMainCharacter() != null ? go.getMainCharacter().getDisplayName() : "";
+        String support = go.getSupportingCharacter() != null ? go.getSupportingCharacter().getDisplayName() : "";
+        String universe = go.getUniverse() != null ? go.getUniverse().getDisplayName() : "";
+        String namePart = main;
+        if (!support.isEmpty()) namePart += "_" + support;
+        if (!universe.isEmpty()) namePart += "_" + universe;
+        if (namePart.isEmpty()) namePart = "Song";
+
+        this.savedSongFilePrefix = formattedDate + namePart + "_song";
+        String fileName = Prompt.DIRECTORY + this.savedSongFilePrefix + ".txt";
+        Gdx.app.log("SaveSongText", "saveSongText " + fileName);
+        FileHandle fileHandle = Gdx.files.local(fileName);
+        fileHandle.writeString(header + text, false);
+    }
+
     @Override
     public void keyPressed(int keyCode, char character) {
         super.keyPressed(keyCode, character);
-
         keys[keyCode] = true;
+
+        // keyDown: only navigation keys for the editor (key repeat)
+        if (this.textEditor.isActive()) {
+            this.textEditor.keyDown(keyCode);
+            ensureCursorVisible();
+        }
     }
 
     @Override
     public void keyButtonReleased(int keyCode, char character) {
         super.keyButtonReleased(keyCode, character);
 
-        keys[keyCode] = false;
+        if (keys[keyCode]) {
+            // This is a real keyUp event (keyDown set keys[keyCode]=true)
+            keys[keyCode] = false;
+
+            if (this.textEditor.isActive()) {
+                // Ctrl combos are handled on keyUp, like in Textfield
+                this.textEditor.keyUp(keyCode);
+                handleEditorTextChange();
+            }
+        } else {
+            // This is a keyTyped event (character is the real typed char)
+            if (this.textEditor.isActive()) {
+                this.textEditor.addTypedCharacter(character);
+                handleEditorTextChange();
+                ensureCursorVisible();
+            }
+        }
+    }
+
+    private void handleEditorTextChange() {
+        if (this.textEditor.isTextChanged()) {
+            this.textEditor.clearTextChanged();
+            relayoutAfterEdit();
+            saveEditedText();
+        }
+    }
+
+    private void ensureCursorVisible() {
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        int neededSpread = this.textEditor.getSpreadForCursor(rowsPerPage);
+        if (neededSpread != this.currentSpread && !pageAnimation.isAnimating()) {
+            this.pendingSpread = neededSpread;
+            if (neededSpread > this.currentSpread) {
+                pageAnimation.start(PageTurnAnimation.Direction.FORWARD);
+            } else {
+                pageAnimation.start(PageTurnAnimation.Direction.BACKWARD);
+            }
+            Gdx.graphics.setContinuousRendering(true);
+        }
+        Gdx.graphics.requestRendering();
     }
 
     public void mouseMoved(int mouseX, int mouseY) {
@@ -627,6 +877,13 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     public void mousePressed(int x, int y, boolean isRightButton) {
         if (isRightButton && !this.isPressed) {
             this.isPressed = true;
+            return;
+        }
+        if (this.textEditor.isActive() && !isRightButton) {
+            int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+            this.textEditor.handleClick(x, y, this.fontSize, this.currentSpread,
+                    rowsPerPage, this.fontSize.getNext(1).getFont(),
+                    this.bookRenderer.getChapterLines());
         }
     }
 
@@ -635,6 +892,13 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             if (!this.isPressed) {
                 this.mousePressed(x, y, isRightButton);
             }
+            return;
+        }
+        if (this.textEditor.isActive()) {
+            int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+            this.textEditor.handleDrag(x, y, this.fontSize, this.currentSpread,
+                    rowsPerPage, this.fontSize.getNext(1).getFont(),
+                    this.bookRenderer.getChapterLines());
         }
     }
 
@@ -791,12 +1055,15 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         String title = extractTitleFromLyrics(lyrics);
         SunoApiIO sunoApi = new SunoApiIO(this);
         sunoApi.setCharacterHeader(this.pendingSunoHeader);
+        if (!this.savedSongFilePrefix.isEmpty()) {
+            sunoApi.setExistingFilePrefix(this.savedSongFilePrefix);
+        }
         sunoApi.generateSongCustom(lyrics, this.pendingSunoStyle, title);
     }
 
     private String buildTtsText() {
         StringBuilder sb = new StringBuilder();
-        for (String line : this.textArea.getMyText()) {
+        for (String line : getActiveDisplayLines()) {
             if (line.trim().isEmpty()) continue;
             if (sb.length() > 0) sb.append(" ");
             sb.append(line);
@@ -809,6 +1076,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.pendingSunoReady = false;
         this.currentSpread = 0;
         this.pendingSpread = 0;
+        this.textEditor.setActive(false);
 
         this.choosenReadStory += add;
 
@@ -896,10 +1164,17 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         boolean hasMp3 = choosenListenStory != -1 || (songVariantHandles != null && songVariantHandles.length > 0);
         getMainPanel().getButtonByFunction(FUNCTION_UPLOAD_TONIE).setVisible(hasMp3);
-        getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(!hasMp3 && !isSong);
 
-        // Hide "Vorlesen" button for songs
-        if (isSong) {
+        if (isSong && !hasMp3) {
+            // Song without MP3 → show "Generate Song" button
+            ApoButton genBtn = getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3);
+            genBtn.setId("button_generate_song");
+            genBtn.setVisible(true);
+            this.pendingSunoReady = true;
+            this.savedSongFilePrefix = searchName;
+        } else if (!hasMp3 && !isSong) {
+            getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(true);
+        } else {
             getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(false);
         }
 
@@ -984,7 +1259,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         int newSpread = this.currentSpread + add;
         int newLeftStart = newSpread * 2 * rowsPerPage;
 
-        if (newSpread >= 0 && newLeftStart < this.textArea.getMyText().size()) {
+        if (newSpread >= 0 && newLeftStart < getActiveDisplayLines().size()) {
             this.pendingSpread = newSpread;
             if (add > 0) {
                 pageAnimation.start(PageTurnAnimation.Direction.FORWARD);
@@ -1002,7 +1277,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.textArea.setAdd(this.fontSize.getAdd());
         this.textArea.setFont(this.fontSize.getFont());
         this.textArea.setText(this.textArea.getText());
-        processAndLayoutChapters();
+        this.textEditor.setFont(this.fontSize.getFont());
+        if (this.textEditor.isActive()) {
+            buildEditableLayout();
+        } else {
+            processAndLayoutChapters();
+        }
         rebuildHighlighterMapping();
         updatePageButtonVisibility();
 
@@ -1023,9 +1303,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private void rebuildHighlighterMapping() {
-        if (this.highlighter != null && this.textArea != null && this.textArea.getMyText() != null) {
+        ArrayList<String> lines = getActiveDisplayLines();
+        if (this.highlighter != null && lines != null && !lines.isEmpty()) {
             this.highlighter.buildMapping(
-                    this.textArea.getMyText(),
+                    lines,
                     this.fontSize.getFont(),
                     this.fontSize.getNext(1).getFont(),
                     this.bookRenderer.getChapterLines());
@@ -1067,6 +1348,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     @Override
     public void doThink(float delta) {
+        this.textEditor.think((int) delta);
+
         if (this.music != null && this.music.isPlaying()) {
             int currentSecond = (int) this.music.getPosition();
             if (currentSecond != this.lastRenderedSecond) {
@@ -1117,6 +1400,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                     this.running = Running.NONE;
                     this.statusText = "Error: No lyrics received";
                 } else {
+                    // Save lyrics immediately so they persist
+                    this.saveSongText(text);
+                    this.reloadFileHandler();
+
                     // Show lyrics in book form, let user review before generating song
                     this.pendingSunoReady = true;
                     this.running = Running.NONE;
@@ -1184,6 +1471,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         // Word highlight (between page background and text)
         renderWordHighlight();
 
+        // Editor selection highlight
+        renderEditorSelection();
+
         // Story and audio info above book
         getMainPanel().spriteBatch.begin();
         if (this.running != Running.CREATE_STORY) {
@@ -1200,8 +1490,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
         int leftStart = this.currentSpread * 2 * rowsPerPage;
         int rightStart = leftStart + rowsPerPage;
+        ArrayList<String> displayLines = getActiveDisplayLines();
 
-        if (this.textArea.getMyText() != null && !this.textArea.getMyText().isEmpty()) {
+        if (displayLines != null && !displayLines.isEmpty()) {
             if (pageAnimation.isAnimating()) {
                 // Calculate old and new spread line positions
                 int oldLeftStart = this.currentSpread * 2 * rowsPerPage;
@@ -1209,17 +1500,29 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 int newLeftStart = this.pendingSpread * 2 * rowsPerPage;
                 int newRightStart = newLeftStart + rowsPerPage;
 
-                bookRenderer.renderTurnAnimation(pageAnimation, this.textArea.getMyText(),
+                bookRenderer.renderTurnAnimation(pageAnimation, displayLines,
                         oldLeftStart, oldRightStart,
                         newRightStart, newLeftStart,
                         rowsPerPage, this.fontSize);
             } else {
-                bookRenderer.renderPageText(this.textArea.getMyText(), leftStart, rowsPerPage, this.fontSize, true);
-                bookRenderer.renderPageText(this.textArea.getMyText(), rightStart, rowsPerPage, this.fontSize, false);
+                bookRenderer.renderPageText(displayLines, leftStart, rowsPerPage, this.fontSize, true);
+                bookRenderer.renderPageText(displayLines, rightStart, rowsPerPage, this.fontSize, false);
+            }
+
+            // Editor cursor (between text and page numbers)
+            if (this.textEditor.isActive() && !pageAnimation.isAnimating()) {
+                getMainPanel().spriteBatch.end();
+                Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
+                this.textEditor.renderCursor(getMainPanel().getRenderer(), this.fontSize,
+                        this.currentSpread, rowsPerPage,
+                        this.fontSize.getNext(1).getFont(),
+                        this.bookRenderer.getChapterLines());
+                Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
+                getMainPanel().spriteBatch.begin();
             }
 
             // Page numbers - during animation, show numbers matching visible content per phase
-            int totalPages = (int) Math.ceil((double) this.textArea.getMyText().size() / rowsPerPage);
+            int totalPages = (int) Math.ceil((double) displayLines.size() / rowsPerPage);
             if (pageAnimation.isAnimating()) {
                 float progress = pageAnimation.getProgress();
                 boolean isForward = pageAnimation.getDirection() == PageTurnAnimation.Direction.FORWARD;
@@ -1280,7 +1583,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void renderWordHighlight() {
         if (this.highlighter == null || this.highlighter.getCurrentWordIndex() < 0) return;
-        if (this.textArea == null || this.textArea.getMyText() == null) return;
+        ArrayList<String> lines = getActiveDisplayLines();
+        if (lines == null || lines.isEmpty()) return;
 
         int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
         int leftStart = this.currentSpread * 2 * rowsPerPage;
@@ -1289,6 +1593,18 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
         this.highlighter.renderHighlight(getMainPanel().getRenderer(), this.fontSize, leftStart, rowsPerPage);
         getMainPanel().getRenderer().end();
+        Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
+    }
+
+    private void renderEditorSelection() {
+        if (!this.textEditor.isActive() || !this.textEditor.hasSelection()) return;
+
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
+        this.textEditor.renderSelection(getMainPanel().getRenderer(), this.fontSize,
+                this.currentSpread, rowsPerPage,
+                this.fontSize.getNext(1).getFont(),
+                this.bookRenderer.getChapterLines());
         Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
     }
 

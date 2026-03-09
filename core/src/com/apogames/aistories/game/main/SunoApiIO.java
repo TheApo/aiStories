@@ -27,6 +27,8 @@ public class SunoApiIO {
     private final MainInterface main;
     private final Gson gson = new Gson();
     private String characterHeader = "";
+    private String existingFilePrefix = "";
+    private String songStyle = "";
 
     public SunoApiIO(MainInterface main) {
         this.main = main;
@@ -36,8 +38,13 @@ public class SunoApiIO {
         this.characterHeader = characterHeader;
     }
 
+    public void setExistingFilePrefix(String prefix) {
+        this.existingFilePrefix = prefix;
+    }
+
     public void generateSongCustom(String lyrics, String style, String title) {
         main.setRunning(Running.CREATE_SONG);
+        this.songStyle = style != null ? style : "";
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("prompt", lyrics);
@@ -249,28 +256,38 @@ public class SunoApiIO {
 
         Gdx.app.log("SunoApiIO", "Got " + audioUrls.size() + " tracks, title: " + title);
 
-        String filePrefix = buildFilePrefix(title);
+        boolean hasExistingFile = existingFilePrefix != null && !existingFilePrefix.isEmpty();
+        String filePrefix = hasExistingFile ? existingFilePrefix : buildFilePrefix(title) + "_song";
         String finalLyrics = lyrics != null ? lyrics : "";
-        String finalTitle = title != null ? title : "Song";
-        String finalTags = tags != null ? tags : "";
 
         // Download MP3s
         for (int i = 0; i < audioUrls.size(); i++) {
             String suffix = (audioUrls.size() > 1) ? "_v" + (i + 1) : "";
-            String mp3Path = Prompt.DIRECTORY + filePrefix + "_song" + suffix + ".mp3";
+            String mp3Path = Prompt.DIRECTORY + filePrefix + suffix + ".mp3";
             downloadMp3Sync(audioUrls.get(i), mp3Path);
         }
 
-        // Save lyrics as txt (with _song marker)
-        String txtPath = Prompt.DIRECTORY + filePrefix + "_song.txt";
-        String header = characterHeader.isEmpty() ? "song" : "song;" + characterHeader;
-        String txtContent = header + ListenStories_SEPARATOR + finalLyrics;
-        Gdx.app.postRunnable(() -> {
-            FileHandle txtFile = Gdx.files.local(txtPath);
-            txtFile.writeString(txtContent, false);
-            main.setFileHandle(txtFile);
-            main.setRunning(Running.NONE);
-        });
+        if (hasExistingFile) {
+            // TXT already saved, just reload
+            String txtPath = Prompt.DIRECTORY + filePrefix + ".txt";
+            Gdx.app.postRunnable(() -> {
+                FileHandle txtFile = Gdx.files.local(txtPath);
+                main.setFileHandle(txtFile);
+                main.setRunning(Running.NONE);
+            });
+        } else {
+            // Save lyrics as txt (with _song marker)
+            String txtPath = Prompt.DIRECTORY + filePrefix + ".txt";
+            String header = characterHeader.isEmpty() ? "song" : "song;" + characterHeader;
+            if (!songStyle.isEmpty()) header += ";" + songStyle;
+            String txtContent = header + ListenStories_SEPARATOR + finalLyrics;
+            Gdx.app.postRunnable(() -> {
+                FileHandle txtFile = Gdx.files.local(txtPath);
+                txtFile.writeString(txtContent, false);
+                main.setFileHandle(txtFile);
+                main.setRunning(Running.NONE);
+            });
+        }
     }
 
     private static final String ListenStories_SEPARATOR = ";!;!";
