@@ -216,22 +216,22 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 String[] songParts = values.split(";");
                 if (songParts.length >= 6) {
                     GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
-                    go.setMainCharacter(resolveEntity(songParts[1], go.getMainCharacter(), this.getMainPanel().getCustomMainEntity()));
-                    go.setSupportingCharacter(resolveEntity(songParts[2], go.getSupportingCharacter(), this.getMainPanel().getCustomSupportingEntity()));
-                    go.setUniverse(resolveEntity(songParts[3], go.getUniverse(), this.getMainPanel().getCustomUniverse()));
-                    go.setPlaces(resolveEntity(songParts[4], go.getPlaces(), this.getMainPanel().getCustomPlaces()));
-                    go.setObjectives(resolveEntity(songParts[5], go.getObjectives(), this.getMainPanel().getCustomObjectives()));
+                    go.setMainCharacter(resolveEntity(songParts[1], go.getMainCharacter(), this.getMainPanel().getCustomMainEntity(), MainCharacter.values()[0]));
+                    go.setSupportingCharacter(resolveEntity(songParts[2], go.getSupportingCharacter(), this.getMainPanel().getCustomSupportingEntity(), SupportingCharacter.values()[0]));
+                    go.setUniverse(resolveEntity(songParts[3], go.getUniverse(), this.getMainPanel().getCustomUniverse(), Universe.values()[0]));
+                    go.setPlaces(resolveEntity(songParts[4], go.getPlaces(), this.getMainPanel().getCustomPlaces(), Places.values()[0]));
+                    go.setObjectives(resolveEntity(songParts[5], go.getObjectives(), this.getMainPanel().getCustomObjectives(), Objectives.values()[0]));
                 }
                 text = text.substring(text.indexOf(SEPARATOR_IN_FILE) + SEPARATOR_IN_FILE.length());
             } else {
                 String[] split = values.split(";");
 
                 GameObjectives go = this.getMainPanel().getPromptObject().getGameObjectives();
-                go.setMainCharacter(resolveEntity(split[0], go.getMainCharacter(), this.getMainPanel().getCustomMainEntity()));
-                go.setSupportingCharacter(resolveEntity(split[1], go.getSupportingCharacter(), this.getMainPanel().getCustomSupportingEntity()));
-                go.setUniverse(resolveEntity(split[2], go.getUniverse(), this.getMainPanel().getCustomUniverse()));
-                go.setPlaces(resolveEntity(split[3], go.getPlaces(), this.getMainPanel().getCustomPlaces()));
-                go.setObjectives(resolveEntity(split[4], go.getObjectives(), this.getMainPanel().getCustomObjectives()));
+                go.setMainCharacter(resolveEntity(split[0], go.getMainCharacter(), this.getMainPanel().getCustomMainEntity(), MainCharacter.values()[0]));
+                go.setSupportingCharacter(resolveEntity(split[1], go.getSupportingCharacter(), this.getMainPanel().getCustomSupportingEntity(), SupportingCharacter.values()[0]));
+                go.setUniverse(resolveEntity(split[2], go.getUniverse(), this.getMainPanel().getCustomUniverse(), Universe.values()[0]));
+                go.setPlaces(resolveEntity(split[3], go.getPlaces(), this.getMainPanel().getCustomPlaces(), Places.values()[0]));
+                go.setObjectives(resolveEntity(split[4], go.getObjectives(), this.getMainPanel().getCustomObjectives(), Objectives.values()[0]));
                 text = text.substring(text.indexOf(SEPARATOR_IN_FILE) + SEPARATOR_IN_FILE.length());
             }
         }
@@ -461,14 +461,19 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private EnumInterface resolveEntity(String name, EnumInterface current, CustomEntity custom) {
+        return resolveEntity(name, current, custom, null);
+    }
+
+    private EnumInterface resolveEntity(String name, EnumInterface current, CustomEntity custom, EnumInterface fallback) {
         if (name == null || name.isEmpty()) {
             return null;
         }
         if (custom != null && custom.getName().equals(name)) {
             return custom;
         }
-        if (current != null) {
-            return current.getEnumByName(name);
+        EnumInterface lookup = current != null ? current : fallback;
+        if (lookup != null) {
+            return lookup.getEnumByName(name);
         }
         return null;
     }
@@ -479,6 +484,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.pendingSpread = 0;
         this.pendingSunoCustom = false;
         this.pendingSunoReady = false;
+        this.bookRenderer.getChapterLines().clear();
         this.setButtonsInsivislbe();
     }
 
@@ -489,6 +495,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.pendingSpread = 0;
         this.pendingSunoCustom = false;
         this.pendingSunoReady = false;
+        this.bookRenderer.getChapterLines().clear();
         this.setButtonsInsivislbe();
     }
 
@@ -499,6 +506,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.pendingSpread = 0;
         this.pendingSunoCustom = false;
         this.pendingSunoReady = false;
+        this.bookRenderer.getChapterLines().clear();
         this.setButtonsInsivislbe();
     }
 
@@ -765,6 +773,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private void createMissingMp3() {
         String searchName = this.fileTXTHandles[this.choosenReadStory].file().getName();
         searchName = searchName.substring(0, searchName.length() - 4);
+
+        this.statusText = Localization.getInstance().getCommon().get("text_audio_wait_time");
 
         ElvenlabIO elevenlabIO = new ElvenlabIO(this);
         elevenlabIO.sendTextToSpeech(buildTtsText(), Prompt.DIRECTORY+searchName+".mp3");
@@ -1152,10 +1162,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.statusText = this.nextStatusText;
             this.nextStatusText = null;
             Gdx.graphics.requestRendering();
-        } else if (this.reload) {
-            reloadFileHandler(this.choosenReadStory);
+        }
 
+        if (this.reload) {
+            reloadFileHandler(this.choosenReadStory);
             this.reload = false;
+            Gdx.graphics.requestRendering();
         }
     }
 

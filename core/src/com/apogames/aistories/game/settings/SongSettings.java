@@ -30,7 +30,7 @@ public class SongSettings {
         }
     }
 
-    private MusicStyle musicStyle = MusicStyle.POP;
+    private MusicStyle musicStyle = MusicStyle.LULLABY;
     private StorySettings.AgeGroup ageGroup = StorySettings.AgeGroup.AGE_8_12;
     private SongLength songLength = SongLength.MEDIUM;
     private String promptTemplate = "";
@@ -51,9 +51,9 @@ public class SongSettings {
     public void load() {
         Preferences prefs = Gdx.app.getPreferences(PREFS_NAME);
         try {
-            musicStyle = MusicStyle.valueOf(prefs.getString("musicStyle", MusicStyle.POP.name()));
+            musicStyle = MusicStyle.valueOf(prefs.getString("musicStyle", MusicStyle.LULLABY.name()));
         } catch (IllegalArgumentException e) {
-            musicStyle = MusicStyle.POP;
+            musicStyle = MusicStyle.LULLABY;
         }
         try {
             ageGroup = StorySettings.AgeGroup.valueOf(prefs.getString("ageGroup", StorySettings.AgeGroup.AGE_8_12.name()));
