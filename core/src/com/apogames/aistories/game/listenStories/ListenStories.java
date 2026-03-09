@@ -70,6 +70,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private FileHandle[] songVariantHandles;
 
     private boolean pendingSunoCustom = false;
+    private boolean pendingSunoReady = false;
     private String pendingSunoStyle = "";
     private String pendingSunoHeader = "";
 
@@ -384,6 +385,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private boolean hasAudioCapability() {
+        if (this.pendingSunoReady) return true;
         boolean hasMp3 = this.choosenListenStory >= 0;
         boolean hasSongVariants = this.songVariantHandles != null && this.songVariantHandles.length > 0;
         boolean hasElevenLabs = ElvenlabIO.API_KEY != null && !ElvenlabIO.API_KEY.isEmpty()
@@ -476,6 +478,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.currentSpread = 0;
         this.pendingSpread = 0;
         this.pendingSunoCustom = false;
+        this.pendingSunoReady = false;
         this.setButtonsInsivislbe();
     }
 
@@ -485,6 +488,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.currentSpread = 0;
         this.pendingSpread = 0;
         this.pendingSunoCustom = false;
+        this.pendingSunoReady = false;
         this.setButtonsInsivislbe();
     }
 
@@ -494,6 +498,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.currentSpread = 0;
         this.pendingSpread = 0;
         this.pendingSunoCustom = false;
+        this.pendingSunoReady = false;
         this.setButtonsInsivislbe();
     }
 
@@ -672,7 +677,11 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 deleteCurrentFileAndText();
                 break;
             case ListenStories.FUNCTION_CREATEMP3:
-                this.createMissingMp3();
+                if (this.pendingSunoReady) {
+                    startSunoFromLyrics();
+                } else {
+                    this.createMissingMp3();
+                }
                 break;
             case ListenStories.FUNCTION_SONG_VARIANT:
                 switchSongVariant();
@@ -761,6 +770,20 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         elevenlabIO.sendTextToSpeech(buildTtsText(), Prompt.DIRECTORY+searchName+".mp3");
     }
 
+    private void startSunoFromLyrics() {
+        this.pendingSunoReady = false;
+        String lyrics = this.textArea.getText();
+        if (lyrics == null || lyrics.trim().isEmpty()) return;
+
+        getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setId("button_read");
+        setButtonsInsivislbe();
+
+        String title = extractTitleFromLyrics(lyrics);
+        SunoApiIO sunoApi = new SunoApiIO(this);
+        sunoApi.setCharacterHeader(this.pendingSunoHeader);
+        sunoApi.generateSongCustom(lyrics, this.pendingSunoStyle, title);
+    }
+
     private String buildTtsText() {
         StringBuilder sb = new StringBuilder();
         for (String line : this.textArea.getMyText()) {
@@ -773,6 +796,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void nextStory(int add) {
         this.stopMusic();
+        this.pendingSunoReady = false;
         this.currentSpread = 0;
         this.pendingSpread = 0;
 
@@ -1024,6 +1048,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     @Override
     protected void quit() {
         this.stopMusic();
+        this.pendingSunoReady = false;
         if (this.music != null) {
             this.music.dispose();
         }
@@ -1071,7 +1096,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.nextText = null;
 
             if (this.pendingSunoCustom) {
-                // Two-step flow: lyrics arrived from LLM → display, then start Suno custom mode
+                // Two-step flow: lyrics arrived from LLM → display in book for review
                 this.pendingSunoCustom = false;
                 this.fontSize = FontSize.FONT_25;
                 this.setTextInTextArea(text);
@@ -1082,11 +1107,20 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                     this.running = Running.NONE;
                     this.statusText = "Error: No lyrics received";
                 } else {
-                    // Start Suno custom mode with the lyrics
-                    SunoApiIO sunoApi = new SunoApiIO(this);
-                    sunoApi.setCharacterHeader(this.pendingSunoHeader);
-                    String title = extractTitleFromLyrics(text);
-                    sunoApi.generateSongCustom(text, this.pendingSunoStyle, title);
+                    // Show lyrics in book form, let user review before generating song
+                    this.pendingSunoReady = true;
+                    this.running = Running.NONE;
+
+                    getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(true);
+                    getMainPanel().getButtonByFunction(FUNCTION_FONT_BIGGER).setVisible(true);
+                    getMainPanel().getButtonByFunction(FUNCTION_FONT_SMALLER).setVisible(true);
+
+                    ApoButton genBtn = getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3);
+                    genBtn.setId("button_generate_song");
+                    genBtn.setVisible(true);
+
+                    updateLayout();
+                    updatePageButtonVisibility();
                 }
             } else {
                 this.fontSize = FontSize.FONT_25;
