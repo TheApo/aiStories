@@ -39,7 +39,12 @@ public class BookTextEditor {
     private BitmapFont cachedFont;
 
     public boolean isActive() { return active; }
-    public void setActive(boolean active) { this.active = active; }
+    public void setActive(boolean active) {
+        this.active = active;
+        if (active) {
+            Gdx.input.setOnscreenKeyboardVisible(true);
+        }
+    }
     public String getRawText() { return rawText; }
     public int getCursorPos() { return cursorPos; }
     public boolean isTextChanged() { return textChanged; }

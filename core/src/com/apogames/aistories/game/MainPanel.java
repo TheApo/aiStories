@@ -311,6 +311,8 @@ public class MainPanel extends GameScreen {
             this.model.dispose();
         }
 
+        Gdx.input.setOnscreenKeyboardVisible(false);
+
         this.model = model;
 
         this.setButtonsInvisible();
