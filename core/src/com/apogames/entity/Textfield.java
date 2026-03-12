@@ -1,5 +1,6 @@
 package com.apogames.entity;
 
+import com.apogames.aistories.game.MainPanel;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.GameScreen;
 import com.badlogic.gdx.Gdx;
@@ -65,6 +66,7 @@ public class Textfield extends ApoButton {
         super.setSelect(bSelect);
         if (bSelect) {
             Gdx.input.setOnscreenKeyboardVisible(true);
+            MainPanel.setActiveInput(getY(), getHeight());
         }
     }
 

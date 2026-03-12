@@ -17,6 +17,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class CreateStory extends SequentiallyThinkingScreenModel {
 
@@ -146,26 +147,47 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
         if (this.objectSelection == null) {
             this.objectSelection = new ArrayList<>();
 
-            // MainCharacter with custom character support
+            List<EnumInterface> charOptions = this.getMainPanel().buildEffectiveCharacterOptions();
+            List<EnumInterface> universeOptions = this.getMainPanel().buildEffectiveOptions("universe", Universe.values());
+            List<EnumInterface> placesOptions = this.getMainPanel().buildEffectiveOptions("places", Places.values());
+            List<EnumInterface> objectivesOptions = this.getMainPanel().buildEffectiveOptions("objectives", Objectives.values());
+
+            // MainCharacter
             this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getMainCharacter(),
-                    Constants.COLOR_MAIN_CHARACTER, MainCharacter.values(), this.getMainPanel().getCustomMainEntity()));
+                    Constants.COLOR_MAIN_CHARACTER, charOptions));
 
-            // SupportingCharacter with custom character support
+            // SupportingCharacter
             this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getSupportingCharacter(),
-                    Constants.COLOR_SIDE_CHARACTER, SupportingCharacter.values(), this.getMainPanel().getCustomSupportingEntity()));
+                    Constants.COLOR_SIDE_CHARACTER, charOptions));
 
-            // Universe, Places, Objectives - with custom support
+            // Universe, Places, Objectives — same profile system as characters
             this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 2, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getUniverse(),
-                    Constants.COLOR_UNIVERSE, Universe.values(), this.getMainPanel().getCustomUniverse()));
+                    Constants.COLOR_UNIVERSE, universeOptions));
             this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 3, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getPlaces(),
-                    Constants.COLOR_PLACES, Places.values(), this.getMainPanel().getCustomPlaces()));
+                    Constants.COLOR_PLACES, placesOptions));
             this.objectSelection.add(new ObjectSelection(this.getMainPanel(), 10 + 270 * 4, 85, 250, 600,
                     this.getMainPanel().getPromptObject().getGameObjectives().getObjectives(),
-                    Constants.COLOR_OBJECTIVES, Objectives.values(), this.getMainPanel().getCustomObjectives()));
+                    Constants.COLOR_OBJECTIVES, objectivesOptions));
+        } else {
+            // Update all columns with latest profiles
+            List<EnumInterface> charOptions = this.getMainPanel().buildEffectiveCharacterOptions();
+            this.objectSelection.get(0).updateOptions(charOptions);
+            this.objectSelection.get(1).updateOptions(charOptions);
+            this.objectSelection.get(2).updateOptions(this.getMainPanel().buildEffectiveOptions("universe", Universe.values()));
+            this.objectSelection.get(3).updateOptions(this.getMainPanel().buildEffectiveOptions("places", Places.values()));
+            this.objectSelection.get(4).updateOptions(this.getMainPanel().buildEffectiveOptions("objectives", Objectives.values()));
+
+            // Apply pending selection from browse/edit
+            EnumInterface pending = getMainPanel().getPendingCharacterSelection();
+            int pendingCol = getMainPanel().getPendingCharacterColumn();
+            if (pending != null && pendingCol >= 0 && pendingCol < this.objectSelection.size()) {
+                this.objectSelection.get(pendingCol).setGameObjective(pending);
+            }
+            getMainPanel().clearPendingCharacterSelection();
         }
     }
 
@@ -218,13 +240,16 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
             selection.mouseButtonFunction(function);
         }
 
-        // Check for customize or jump-to-custom button clicks
-        for (ObjectSelection selection : this.objectSelection) {
-            if (selection.getCustomEntity() != null) {
-                if (function.equals(selection.getJumpCustomFunctionId())) {
-                    getMainPanel().changeToCustomEntityEditor(selection.getCustomEntity());
-                    return;
-                }
+        // Check for search button clicks — open browse mode (same for all columns)
+        for (int i = 0; i < this.objectSelection.size(); i++) {
+            ObjectSelection selection = this.objectSelection.get(i);
+            if (function.equals(selection.getJumpCustomFunctionId())) {
+                getMainPanel().setPendingCharacterColumn(i);
+                getMainPanel().changeToEntityBrowse(
+                        selection.getGameObjective(), selection.getAllOptions(),
+                        selection.getCustomEntity(), selection.isCharacterColumn(),
+                        selection.getCategoryId());
+                return;
             }
         }
 
@@ -265,8 +290,9 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
 
     public void shufflePrompt() {
         MainPanel main = this.getMainPanel();
+        List<EnumInterface> charOptions = main.buildEffectiveCharacterOptions();
         main.getPromptObject().getGameObjectives().shuffleWithCustoms(
-                main.getCustomMainEntity(), main.getCustomSupportingEntity(),
+                charOptions,
                 main.getCustomUniverse(), main.getCustomPlaces(), main.getCustomObjectives());
         main.getPromptObject().setUpPrompt();
         main.getTextArea().setText(main.getPromptObject().getPrompt());

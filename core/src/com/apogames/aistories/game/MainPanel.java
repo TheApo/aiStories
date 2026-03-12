@@ -25,9 +25,39 @@ import com.badlogic.gdx.Preferences;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public class MainPanel extends GameScreen {
+
+    private static volatile int keyboardPixelHeight = 0;
+    private static volatile float activeInputY = -1;
+    private static volatile float activeInputHeight = 0;
+
+    public static void setKeyboardPixelHeight(int height) {
+        keyboardPixelHeight = height;
+    }
+
+    public static void setActiveInput(float y, float height) {
+        activeInputY = y;
+        activeInputHeight = height;
+    }
+
+    public static void clearActiveInput() {
+        activeInputY = -1;
+        activeInputHeight = 0;
+    }
+
+    private int calculateKeyboardOffset() {
+        if (keyboardPixelHeight <= 0 || activeInputY < 0) return 0;
+        float scaleY = (float) Constants.GAME_HEIGHT / Gdx.graphics.getHeight();
+        float keyboardGameHeight = keyboardPixelHeight * scaleY;
+        float keyboardTopY = Constants.GAME_HEIGHT - keyboardGameHeight;
+        float inputBottomY = activeInputY + activeInputHeight;
+        if (inputBottomY <= keyboardTopY) return 0;
+        return (int) (inputBottomY - keyboardTopY + 15);
+    }
 
     private static final String PREFS_NAME = "AIStoriesCustomEntityPreferences";
     private static final String PREF_CUSTOM_MAIN_NAME = "custom_main_name";
@@ -45,6 +75,8 @@ public class MainPanel extends GameScreen {
     private static final String PREF_CUSTOM_OBJECTIVES_NAME = "custom_objectives_name";
     private static final String PREF_CUSTOM_OBJECTIVES_DETAILS = "custom_objectives_details";
     private static final String PREF_CUSTOM_OBJECTIVES_IMAGE = "custom_objectives_imageIndex";
+
+    private static final String[] PROFILE_CATEGORIES = {"characters", "universe", "places", "objectives"};
 
     private CreateStory createStory;
     private ListenStories listenStory;
@@ -64,6 +96,12 @@ public class MainPanel extends GameScreen {
     private CustomEntity customUniverse;
     private CustomEntity customPlaces;
     private CustomEntity customObjectives;
+
+    private final java.util.Map<String, List<CharacterProfile>> allOverrides = new java.util.HashMap<>();
+    private final java.util.Map<String, List<CharacterProfile>> allCustomProfiles = new java.util.HashMap<>();
+
+    private EnumInterface pendingCharacterSelection;
+    private int pendingCharacterColumn = -1;
 
     public MainPanel() {
         super();
@@ -103,6 +141,7 @@ public class MainPanel extends GameScreen {
         this.customObjectives.setCustomImageManager(new CustomImageManager("objectives"));
 
         loadCustomEntityPreferences();
+        loadCharacterProfiles();
 
         if (this.createStory == null) {
             this.createStory = new CreateStory(this);
@@ -201,6 +240,32 @@ public class MainPanel extends GameScreen {
     public void changeToCustomEntityEditor(CustomEntity customEntity) {
         this.customEntityEditor.setCustomEntity(customEntity);
         this.changeModel(this.customEntityEditor);
+    }
+
+    public void changeToEntityBrowse(EnumInterface currentSelection, java.util.List<EnumInterface> options, CustomEntity customEntity, boolean characterMode, String browseCategory) {
+        this.customEntityEditor.setEntityBrowse(currentSelection, options, customEntity, characterMode, browseCategory);
+        this.changeModel(this.customEntityEditor);
+    }
+
+    public EnumInterface getPendingCharacterSelection() {
+        return pendingCharacterSelection;
+    }
+
+    public void setPendingCharacterSelection(EnumInterface selection) {
+        this.pendingCharacterSelection = selection;
+    }
+
+    public int getPendingCharacterColumn() {
+        return pendingCharacterColumn;
+    }
+
+    public void setPendingCharacterColumn(int column) {
+        this.pendingCharacterColumn = column;
+    }
+
+    public void clearPendingCharacterSelection() {
+        this.pendingCharacterSelection = null;
+        this.pendingCharacterColumn = -1;
     }
 
     public void changeToStorySettings() {
@@ -306,12 +371,185 @@ public class MainPanel extends GameScreen {
         prefs.putInteger(imageKey, custom.getImageIndex());
     }
 
+    // --- Character Profile System ---
+
+    public void loadCharacterProfiles() {
+        for (String category : PROFILE_CATEGORIES) {
+            loadProfilesForCategory(category);
+        }
+    }
+
+    private void loadProfilesForCategory(String category) {
+        CustomImageManager mgr = getImageManagerFor(category);
+
+        String overridesPrefs = "characters".equals(category) ? "AIStoriesCharacterOverrides" : "AIStoriesOverrides_" + category;
+        Preferences prefs = Gdx.app.getPreferences(overridesPrefs);
+        int count = prefs.getInteger("override_count", 0);
+        List<CharacterProfile> overrides = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            CharacterProfile p = new CharacterProfile();
+            p.setCategory(category);
+            p.setBuiltInName(prefs.getString("override_" + i + "_builtInName", ""));
+            p.setDisplayName(prefs.getString("override_" + i + "_name", ""));
+            p.setDisplayDetails(prefs.getString("override_" + i + "_details", ""));
+            p.setImageIndex(prefs.getInteger("override_" + i + "_imageIndex", 0));
+            p.setCustomImageManager(mgr);
+            overrides.add(p);
+        }
+        allOverrides.put(category, overrides);
+
+        String profilesPrefs = "characters".equals(category) ? "AIStoriesSavedCharacters" : "AIStoriesProfiles_" + category;
+        prefs = Gdx.app.getPreferences(profilesPrefs);
+        count = prefs.getInteger("profile_count", 0);
+        List<CharacterProfile> profiles = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            CharacterProfile p = new CharacterProfile();
+            p.setCategory(category);
+            p.setId(prefs.getLong("profile_" + i + "_id", 0));
+            p.setDisplayName(prefs.getString("profile_" + i + "_name", ""));
+            p.setDisplayDetails(prefs.getString("profile_" + i + "_details", ""));
+            p.setImageIndex(prefs.getInteger("profile_" + i + "_imageIndex", 0));
+            p.setCustomImageManager(mgr);
+            profiles.add(p);
+        }
+        allCustomProfiles.put(category, profiles);
+    }
+
+    public void saveProfilesForCategory(String category) {
+        List<CharacterProfile> overrides = allOverrides.getOrDefault(category, java.util.Collections.emptyList());
+        String overridesPrefs = "characters".equals(category) ? "AIStoriesCharacterOverrides" : "AIStoriesOverrides_" + category;
+        Preferences prefs = Gdx.app.getPreferences(overridesPrefs);
+        prefs.clear();
+        prefs.putInteger("override_count", overrides.size());
+        for (int i = 0; i < overrides.size(); i++) {
+            CharacterProfile p = overrides.get(i);
+            prefs.putString("override_" + i + "_builtInName", p.getBuiltInName());
+            prefs.putString("override_" + i + "_name", p.getDisplayName());
+            prefs.putString("override_" + i + "_details", p.getDisplayDetails());
+            prefs.putInteger("override_" + i + "_imageIndex", p.getImageIndex());
+        }
+        prefs.flush();
+
+        List<CharacterProfile> profiles = allCustomProfiles.getOrDefault(category, java.util.Collections.emptyList());
+        String profilesPrefs = "characters".equals(category) ? "AIStoriesSavedCharacters" : "AIStoriesProfiles_" + category;
+        prefs = Gdx.app.getPreferences(profilesPrefs);
+        prefs.clear();
+        prefs.putInteger("profile_count", profiles.size());
+        for (int i = 0; i < profiles.size(); i++) {
+            CharacterProfile p = profiles.get(i);
+            prefs.putLong("profile_" + i + "_id", p.getId());
+            prefs.putString("profile_" + i + "_name", p.getDisplayName());
+            prefs.putString("profile_" + i + "_details", p.getDisplayDetails());
+            prefs.putInteger("profile_" + i + "_imageIndex", p.getImageIndex());
+        }
+        prefs.flush();
+    }
+
+    public CharacterProfile getOverrideFor(String category, String builtInName) {
+        List<CharacterProfile> overrides = allOverrides.get(category);
+        if (overrides == null) return null;
+        for (CharacterProfile p : overrides) {
+            if (p.getBuiltInName().equals(builtInName)) return p;
+        }
+        return null;
+    }
+
+    public CharacterProfile getOverrideFor(String builtInName) {
+        return getOverrideFor("characters", builtInName);
+    }
+
+    public List<CharacterProfile> getCustomProfiles(String category) {
+        return allCustomProfiles.getOrDefault(category, new ArrayList<>());
+    }
+
+    public List<CharacterProfile> getCustomProfiles() {
+        return getCustomProfiles("characters");
+    }
+
+    public void saveOverride(String category, CharacterProfile override) {
+        List<CharacterProfile> overrides = allOverrides.computeIfAbsent(category, k -> new ArrayList<>());
+        overrides.removeIf(p -> p.getBuiltInName().equals(override.getBuiltInName()));
+        overrides.add(override);
+        saveProfilesForCategory(category);
+    }
+
+    public void saveOverride(CharacterProfile override) {
+        saveOverride("characters", override);
+    }
+
+    public void removeOverride(String category, String builtInName) {
+        List<CharacterProfile> overrides = allOverrides.get(category);
+        if (overrides != null) overrides.removeIf(p -> p.getBuiltInName().equals(builtInName));
+        saveProfilesForCategory(category);
+    }
+
+    public void removeOverride(String builtInName) {
+        removeOverride("characters", builtInName);
+    }
+
+    public void addProfile(String category, CharacterProfile profile) {
+        List<CharacterProfile> profiles = allCustomProfiles.computeIfAbsent(category, k -> new ArrayList<>());
+        profiles.add(profile);
+        saveProfilesForCategory(category);
+    }
+
+    public void addProfile(CharacterProfile profile) {
+        addProfile("characters", profile);
+    }
+
+    public void deleteProfile(String category, long id) {
+        List<CharacterProfile> profiles = allCustomProfiles.get(category);
+        if (profiles != null) profiles.removeIf(p -> p.getId() == id);
+        saveProfilesForCategory(category);
+    }
+
+    public void deleteProfile(long id) {
+        deleteProfile("characters", id);
+    }
+
+    public void saveCharacterProfiles() {
+        saveProfilesForCategory("characters");
+    }
+
+    public List<EnumInterface> buildEffectiveOptions(String category, EnumInterface[] enumValues) {
+        List<EnumInterface> options = new ArrayList<>();
+        for (EnumInterface e : enumValues) {
+            CharacterProfile override = getOverrideFor(category, e.getName());
+            if (override != null) {
+                options.add(override);
+            } else {
+                options.add(e);
+            }
+        }
+        options.addAll(getCustomProfiles(category));
+        return options;
+    }
+
+    public List<EnumInterface> buildEffectiveCharacterOptions() {
+        return buildEffectiveOptions("characters", MainCharacter.values());
+    }
+
+    public CustomImageManager getImageManagerFor(String category) {
+        switch (category) {
+            case "characters": return this.customMainEntity.getCustomImageManager();
+            case "universe": return this.customUniverse.getCustomImageManager();
+            case "places": return this.customPlaces.getCustomImageManager();
+            case "objectives": return this.customObjectives.getCustomImageManager();
+            default: return null;
+        }
+    }
+
+    public CustomImageManager getSharedCharacterImageManager() {
+        return getImageManagerFor("characters");
+    }
+
     private void changeModel(final ScreenModel model) {
         if (this.model != null) {
             this.model.dispose();
         }
 
         Gdx.input.setOnscreenKeyboardVisible(false);
+        clearActiveInput();
 
         this.model = model;
 
@@ -335,12 +573,40 @@ public class MainPanel extends GameScreen {
         super.render(delta);
 
         if (model != null) {
+            int offsetY = calculateKeyboardOffset();
+            if (offsetY != 0) {
+                cam.position.y -= offsetY;
+                cam.update();
+                spriteBatch.setProjectionMatrix(cam.combined);
+                getRenderer().setProjectionMatrix(cam.combined);
+            }
+
             model.render();
+
+            if (offsetY != 0) {
+                cam.position.y += offsetY;
+                cam.update();
+                spriteBatch.setProjectionMatrix(cam.combined);
+                getRenderer().setProjectionMatrix(cam.combined);
+            }
+
             model.drawOverlay();
         }
         this.spriteBatch.begin();
         this.drawString(String.valueOf(Gdx.graphics.getFramesPerSecond()), 5, 5, Constants.COLOR_PURPLE, AssetLoader.font15, DrawString.BEGIN, false, false);
         this.spriteBatch.end();
+    }
+
+    private int fullScreenWidth = 0;
+    private int fullScreenHeight = 0;
+
+    @Override
+    public void resize(int width, int height) {
+        if (fullScreenWidth == 0 || (width >= fullScreenWidth && height >= fullScreenHeight)) {
+            fullScreenWidth = width;
+            fullScreenHeight = height;
+            super.resize(width, height);
+        }
     }
 
     public void renderBackground() {

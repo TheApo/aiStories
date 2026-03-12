@@ -1,6 +1,7 @@
 package com.apogames.aistories.game.listenStories;
 
 import com.apogames.aistories.Constants;
+import com.apogames.aistories.game.MainPanel;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -43,6 +44,7 @@ public class BookTextEditor {
         this.active = active;
         if (active) {
             Gdx.input.setOnscreenKeyboardVisible(true);
+            MainPanel.setActiveInput(BookRenderer.BOOK_Y, BookRenderer.getBookHeight());
         }
     }
     public String getRawText() { return rawText; }

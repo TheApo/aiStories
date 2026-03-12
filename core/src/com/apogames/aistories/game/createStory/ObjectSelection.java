@@ -9,7 +9,7 @@ import com.apogames.backend.DrawString;
 import com.apogames.backend.GameScreen;
 import com.apogames.common.Localization;
 import com.apogames.entity.ApoButtonCheckIcon;
-import com.apogames.entity.ApoButtonEditIcon;
+import com.apogames.entity.ApoButtonIcon;
 import com.apogames.entity.ApoButtonMovement;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import lombok.Getter;
@@ -42,17 +42,17 @@ public class ObjectSelection implements ObjectSelectionInterface {
 
     private final float[] background_color;
     @Getter
-    @Setter
     private EnumInterface gameObjective;
 
-    private final ApoButtonMovement upButton;
-    private final ApoButtonMovement downButton;
-    private ApoButtonEditIcon jumpCustomButton;
+    private ApoButtonMovement upButton;
+    private ApoButtonMovement downButton;
+    private ApoButtonIcon jumpCustomButton;
     private ApoButtonCheckIcon toggleButton;
     @Getter
     private CustomEntity customEntity;
     @Getter
     private boolean enabled = true;
+    private boolean characterColumn;
 
     private final List<EnumInterface> allOptions;
     private int currentIndex;
@@ -61,39 +61,46 @@ public class ObjectSelection implements ObjectSelectionInterface {
         this(main, x, y, width, height, gameObjective, BACKGROUND_COLOR, null, null);
     }
 
-    public ObjectSelection(MainPanel main, int x, int y, int width, int height, final EnumInterface gameObjective, float[] color) {
-        this(main, x, y, width, height, gameObjective, color, null, null);
-    }
-
     public ObjectSelection(MainPanel main, int x, int y, int width, int height, final EnumInterface gameObjective, float[] color, EnumInterface[] enumValues, CustomEntity customEntity) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
         this.background_color = color;
-
         this.gameObjective = gameObjective;
-
         this.id = this.gameObjective.getEnumName();
-
-        // Build options list
         this.allOptions = new ArrayList<>();
+        initButtons(main, x, y, width, height, color);
         if (enumValues != null) {
             Collections.addAll(this.allOptions, enumValues);
         }
         if (customEntity != null) {
+            this.customEntity = customEntity;
             this.allOptions.add(customEntity);
         }
+        findCurrentIndex();
+        createEditButton(main, x, y, width, height, customEntity != null);
+        createToggleButton(main, x, y, width, height);
+    }
 
-        // Find current index
-        this.currentIndex = 0;
-        for (int i = 0; i < this.allOptions.size(); i++) {
-            if (this.allOptions.get(i) == gameObjective || this.allOptions.get(i).getName().equals(gameObjective.getName())) {
-                this.currentIndex = i;
-                break;
-            }
-        }
+    public ObjectSelection(MainPanel main, int x, int y, int width, int height, final EnumInterface gameObjective, float[] color, List<EnumInterface> characterOptions) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.background_color = color;
+        this.gameObjective = gameObjective;
+        this.id = this.gameObjective.getEnumName();
+        this.allOptions = new ArrayList<>();
+        this.characterColumn = true;
+        initButtons(main, x, y, width, height, color);
+        this.allOptions.addAll(characterOptions);
+        findCurrentIndex();
+        createEditButton(main, x, y, width, height, true);
+        createToggleButton(main, x, y, width, height);
+    }
 
+    private void initButtons(MainPanel main, int x, int y, int width, int height, float[] color) {
         String function = this.id + "_" + UP;
         int buttonWidth = 140;
         int buttonHeight = 60;
@@ -108,24 +115,38 @@ public class ObjectSelection implements ObjectSelectionInterface {
         this.downButton = new ApoButtonMovement(buttonX, buttonY, buttonWidth, buttonHeight, function, color, Constants.COLOR_WHITE);
         this.downButton.setMovement(ApoButtonMovement.MOVEMENT.DOWN);
         main.getButtons().add(this.downButton);
+    }
 
-        if (customEntity != null) {
-            this.customEntity = customEntity;
+    public void setGameObjective(EnumInterface gameObjective) {
+        this.gameObjective = gameObjective;
+        findCurrentIndex();
+    }
 
-            function = this.id + "_" + JUMPCUSTOM;
-            int editSize = 48;
-            // Position on bottom-right corner of the character image (200x200, centered in column)
-            int imageRight = x + width / 2 + 100;
-            int imageBottom = y + height / 2 + 100 - 50;
-            int editX = imageRight - editSize + 8;
-            int editY = imageBottom - editSize + 8;
-            this.jumpCustomButton = new ApoButtonEditIcon(editX, editY, editSize, function, this.background_color, Constants.COLOR_BLACK);
-            this.jumpCustomButton.setVisible(false);
-            main.getButtons().add(this.jumpCustomButton);
+    private void findCurrentIndex() {
+        this.currentIndex = 0;
+        for (int i = 0; i < this.allOptions.size(); i++) {
+            if (this.allOptions.get(i) == gameObjective || this.allOptions.get(i).getName().equals(gameObjective.getName())) {
+                this.currentIndex = i;
+                break;
+            }
         }
+    }
 
-        // Toggle button — top-left corner of the image
-        function = this.id + "_" + TOGGLE;
+    private void createEditButton(MainPanel main, int x, int y, int width, int height, boolean create) {
+        if (!create) return;
+        String function = this.id + "_" + JUMPCUSTOM;
+        int editSize = 48;
+        int imageRight = x + width / 2 + 100;
+        int imageBottom = y + height / 2 + 100 - 50;
+        int editX = imageRight - editSize + 8;
+        int editY = imageBottom - editSize + 8;
+        this.jumpCustomButton = new ApoButtonIcon(editX, editY, editSize, function, this.background_color, Constants.COLOR_BLACK, ApoButtonIcon.IconType.SEARCH);
+        this.jumpCustomButton.setVisible(false);
+        main.getButtons().add(this.jumpCustomButton);
+    }
+
+    private void createToggleButton(MainPanel main, int x, int y, int width, int height) {
+        String function = this.id + "_" + TOGGLE;
         int toggleSize = 48;
         int imageLeft = x + width / 2 - 100;
         int imageTop = y + height / 2 - 100 - 50;
@@ -172,6 +193,34 @@ public class ObjectSelection implements ObjectSelectionInterface {
         return this.id + "_" + JUMPCUSTOM;
     }
 
+    public String getCategoryId() {
+        return this.id;
+    }
+
+    public boolean isCharacterColumn() {
+        return this.characterColumn;
+    }
+
+    public List<EnumInterface> getAllOptions() {
+        return this.allOptions;
+    }
+
+    public void updateOptions(List<EnumInterface> newOptions) {
+        this.allOptions.clear();
+        this.allOptions.addAll(newOptions);
+        this.currentIndex = 0;
+        for (int i = 0; i < allOptions.size(); i++) {
+            if (allOptions.get(i) == gameObjective || allOptions.get(i).getName().equals(gameObjective.getName())) {
+                this.currentIndex = i;
+                this.gameObjective = allOptions.get(i);
+                return;
+            }
+        }
+        if (!allOptions.isEmpty()) {
+            this.gameObjective = allOptions.get(0);
+        }
+    }
+
     @Override
     public void mouseButtonFunction(String function) {
         if (function.equals(this.id + "_" + TOGGLE)) {
@@ -198,16 +247,6 @@ public class ObjectSelection implements ObjectSelectionInterface {
                 this.gameObjective = this.gameObjective.getNext(+1);
             }
 
-        } else if (function.equals(this.id + "_" + JUMPCUSTOM)) {
-            if (this.customEntity != null) {
-                for (int i = 0; i < this.allOptions.size(); i++) {
-                    if (this.allOptions.get(i) == this.customEntity) {
-                        this.currentIndex = i;
-                        this.gameObjective = this.customEntity;
-                        break;
-                    }
-                }
-            }
         }
     }
 
@@ -241,7 +280,7 @@ public class ObjectSelection implements ObjectSelectionInterface {
     public void renderSprite(GameScreen screen, int changeX, int changeY) {
         float[] textColor = this.enabled ? BACKGROUND_BORDER_COLOR : new float[]{0.5f, 0.5f, 0.5f, 1f};
 
-        String categoryName = Localization.getInstance().getCommon().get(this.gameObjective.getEnumName());
+        String categoryName = Localization.getInstance().getCommon().get(this.id);
 
         BitmapFont font = AssetLoader.font30;
         screen.getGlyphLayout().setText(font, categoryName);

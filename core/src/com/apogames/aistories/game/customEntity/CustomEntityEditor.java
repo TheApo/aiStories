@@ -2,7 +2,7 @@ package com.apogames.aistories.game.customEntity;
 
 import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
-import com.apogames.aistories.game.objects.CustomEntity;
+import com.apogames.aistories.game.objects.*;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
@@ -23,6 +23,10 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     public static final String FUNCTION_BACK_TO_GRID = "CUSTOMEDITOR_BACK_TO_GRID";
     public static final String FUNCTION_DO_GENERATE = "CUSTOMEDITOR_DO_GENERATE";
     public static final String FUNCTION_LLM_SWITCH = "CUSTOMEDITOR_LLM_SWITCH";
+    public static final String FUNCTION_NEW_PROFILE = "CUSTOMEDITOR_NEW_PROFILE";
+    public static final String FUNCTION_RESET = "CUSTOMEDITOR_RESET";
+    public static final String FUNCTION_DELETE = "CUSTOMEDITOR_DELETE";
+    public static final String FUNCTION_EDIT_PENCIL = "CUSTOMEDITOR_EDIT_PENCIL";
 
     private static final int PANEL_Y = 90;
     private static final int PANEL_RADIUS = 10;
@@ -52,10 +56,24 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     private static final int STYLE_START_Y = 170;
 
     private enum Mode { GRID, GENERATE, MANAGE }
+    private enum CharacterEditMode { BUILTIN, PROFILE, NEW }
 
     private final boolean[] keys = new boolean[256];
 
     private CustomEntity customEntity;
+
+    // Character profile editing
+    private boolean isCharacterMode;
+    private CharacterEditMode characterEditMode;
+    private String editBuiltInName;
+    private CharacterProfile workingProfile;
+    private EnumInterface editTarget;
+
+    // Browse mode
+    private boolean browseMode;
+    private java.util.List<EnumInterface> browseOptions;
+    private int browseIndex;
+    private String browseCategory;
 
     private Textfield nameField;
     private Textfield detailsField;
@@ -72,6 +90,13 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     private String generateError = null;
     private String imageLlm;
 
+    private String getProfileCategory() {
+        if ("mainCharacter".equals(browseCategory) || "supportingCharacter".equals(browseCategory)) {
+            return "characters";
+        }
+        return browseCategory;
+    }
+
     public CustomEntityEditor(final MainPanel game) {
         super(game);
         this.totalImages = 60;
@@ -79,8 +104,50 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
 
     public void setCustomEntity(CustomEntity customEntity) {
         this.customEntity = customEntity;
+        this.isCharacterMode = false;
+        this.browseMode = false;
         if (customEntity != null) {
             this.totalImages = customEntity.getTotalImages();
+        }
+    }
+
+    public void setEntityBrowse(EnumInterface currentSelection, java.util.List<EnumInterface> options, CustomEntity customEntity, boolean characterMode, String browseCategory) {
+        this.customEntity = customEntity;
+        this.isCharacterMode = true;
+        this.browseMode = true;
+        this.browseCategory = browseCategory;
+        this.browseOptions = new java.util.ArrayList<>(options);
+        this.totalImages = this.browseOptions.size();
+        this.editTarget = currentSelection;
+        this.browseIndex = 0;
+        for (int i = 0; i < options.size(); i++) {
+            if (options.get(i) == currentSelection || options.get(i).getName().equals(currentSelection.getName())) {
+                this.browseIndex = i;
+                break;
+            }
+        }
+    }
+
+    public void setCharacterEdit(EnumInterface character) {
+        this.customEntity = null;
+        this.isCharacterMode = true;
+        this.editTarget = character;
+
+        if (character instanceof CharacterProfile) {
+            CharacterProfile cp = (CharacterProfile) character;
+            if (cp.isBuiltInOverride()) {
+                this.characterEditMode = CharacterEditMode.BUILTIN;
+                this.editBuiltInName = cp.getBuiltInName();
+                this.workingProfile = cp;
+            } else {
+                this.characterEditMode = CharacterEditMode.PROFILE;
+                this.workingProfile = cp;
+                this.editBuiltInName = null;
+            }
+        } else {
+            this.characterEditMode = CharacterEditMode.BUILTIN;
+            this.editBuiltInName = character.getName();
+            this.workingProfile = getMainPanel().getOverrideFor(getProfileCategory(), character.getName());
         }
     }
 
@@ -113,7 +180,11 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
             this.imagePromptField.setMultiLine(true);
         }
 
-        if (this.customEntity != null) {
+        if (this.browseMode) {
+            updateBrowseDisplay();
+        } else if (this.isCharacterMode) {
+            initCharacterMode();
+        } else if (this.customEntity != null) {
             this.nameField.setCurString(this.customEntity.getCustomName());
             this.nameField.setPosition(this.customEntity.getCustomName().length());
             this.detailsField.setCurString(this.customEntity.getCustomDetails());
@@ -138,17 +209,139 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         this.setNeededButtonsVisible();
     }
 
+    private void initCharacterMode() {
+        this.totalImages = getCharacterTotalImages();
+        switch (characterEditMode) {
+            case BUILTIN:
+                if (workingProfile != null) {
+                    nameField.setCurString(workingProfile.getDisplayName());
+                    nameField.setPosition(workingProfile.getDisplayName().length());
+                    detailsField.setCurString(workingProfile.getDisplayDetails());
+                    detailsField.setPosition(workingProfile.getDisplayDetails().length());
+                    selectedImageIndex = workingProfile.getImageIndex();
+                } else if (editTarget != null) {
+                    nameField.setCurString(editTarget.getDisplayName());
+                    nameField.setPosition(editTarget.getDisplayName().length());
+                    detailsField.setCurString(editTarget.getDisplayDetails());
+                    detailsField.setPosition(editTarget.getDisplayDetails().length());
+                    selectedImageIndex = findBuiltInImageIndex(editTarget);
+                }
+                break;
+            case PROFILE:
+                if (workingProfile != null) {
+                    nameField.setCurString(workingProfile.getDisplayName());
+                    nameField.setPosition(workingProfile.getDisplayName().length());
+                    detailsField.setCurString(workingProfile.getDisplayDetails());
+                    detailsField.setPosition(workingProfile.getDisplayDetails().length());
+                    selectedImageIndex = workingProfile.getImageIndex();
+                }
+                break;
+            case NEW:
+                nameField.setCurString("");
+                nameField.setPosition(0);
+                detailsField.setCurString("");
+                detailsField.setPosition(0);
+                selectedImageIndex = 0;
+                break;
+        }
+    }
+
+    private void updateBrowseDisplay() {
+        if (browseOptions == null || browseIndex < 0 || browseIndex >= browseOptions.size()) return;
+        EnumInterface profile = browseOptions.get(browseIndex);
+        nameField.setCurString(profile.getDisplayName());
+        nameField.setPosition(profile.getDisplayName().length());
+        detailsField.setCurString(profile.getDisplayDetails());
+        detailsField.setPosition(profile.getDisplayDetails().length());
+    }
+
+    private void enterEditModeFromBrowse() {
+        if (browseOptions == null || browseIndex < 0 || browseIndex >= browseOptions.size()) return;
+        EnumInterface profile = browseOptions.get(browseIndex);
+
+        setCharacterEdit(profile);
+        initCharacterMode();
+        browseMode = false;
+        scrollOffset = 0;
+        setNeededButtonsVisible();
+    }
+
+    private int getCharacterTotalImages() {
+        String category = getProfileCategory();
+        CustomImageManager mgr = getMainPanel().getImageManagerFor(category);
+        int builtIn = getBuiltInImageCount(category);
+        return builtIn + (mgr != null ? mgr.getCount() : 0);
+    }
+
+    private int getBuiltInImageCount(String category) {
+        int total = 0;
+        for (TextureRegion[] arr : getTextureArraysFor(category)) total += arr.length;
+        return total;
+    }
+
+    private TextureRegion[][] getTextureArraysFor(String category) {
+        switch (category) {
+            case "universe": return new TextureRegion[][]{AssetLoader.universeTextureRegion};
+            case "places": return new TextureRegion[][]{AssetLoader.placesTextureRegion};
+            case "objectives": return new TextureRegion[][]{AssetLoader.objectivesTextureRegion};
+            default: return new TextureRegion[][]{AssetLoader.maincharacterTextureRegion, AssetLoader.supportCharacterTextureRegion};
+        }
+    }
+
+    private TextureRegion getCharacterTextureByIndex(int index) {
+        String category = getProfileCategory();
+        TextureRegion[][] arrays = getTextureArraysFor(category);
+        int offset = 0;
+        for (TextureRegion[] arr : arrays) {
+            if (index < offset + arr.length) return arr[index - offset];
+            offset += arr.length;
+        }
+        CustomImageManager mgr = getMainPanel().getImageManagerFor(category);
+        int customIdx = index - offset;
+        if (mgr != null && customIdx >= 0 && customIdx < mgr.getCount()) {
+            return mgr.getTexture(customIdx);
+        }
+        return arrays[0][0];
+    }
+
+    private int findBuiltInImageIndex(EnumInterface builtIn) {
+        TextureRegion target = builtIn.getImage();
+        String category = getProfileCategory();
+        TextureRegion[][] arrays = getTextureArraysFor(category);
+        int offset = 0;
+        for (TextureRegion[] arr : arrays) {
+            for (int i = 0; i < arr.length; i++) {
+                if (arr[i] == target) return offset + i;
+            }
+            offset += arr.length;
+        }
+        return 0;
+    }
+
     @Override
     public void setNeededButtonsVisible() {
+        boolean isGridMode = currentMode == Mode.GRID;
+        boolean isBrowse = browseMode;
+
         // X button only in grid mode (generate/manage have their own back button)
-        getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(currentMode == Mode.GRID);
-        getMainPanel().getButtonByFunction(FUNCTION_CONFIRM).setVisible(currentMode == Mode.GRID);
+        getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(isGridMode);
+        getMainPanel().getButtonByFunction(FUNCTION_CONFIRM).setVisible(isGridMode);
+
+        // Update confirm button text based on mode
+        ApoButton confirmBtn = getMainPanel().getButtonByFunction(FUNCTION_CONFIRM);
+        if (isBrowse) {
+            confirmBtn.setId("custom_editor_select");
+        } else {
+            confirmBtn.setId("custom_editor_save");
+        }
 
         boolean hasAI = hasOpenAI() || hasGemini();
-        getMainPanel().getButtonByFunction(FUNCTION_AI_GENERATE).setVisible(currentMode == Mode.GRID && hasAI);
+        // AI button hidden in browse mode
+        getMainPanel().getButtonByFunction(FUNCTION_AI_GENERATE).setVisible(isGridMode && hasAI && !isBrowse);
 
         // Manage only visible after entering generate/manage (not in grid)
-        boolean hasCustomImages = customEntity != null && customEntity.getCustomImageCount() > 0;
+        CustomImageManager catMgr = getMainPanel().getImageManagerFor(getProfileCategory());
+        boolean hasCustomImages = catMgr != null && catMgr.getCount() > 0;
         getMainPanel().getButtonByFunction(FUNCTION_MANAGE).setVisible(currentMode != Mode.GRID && hasCustomImages);
 
         getMainPanel().getButtonByFunction(FUNCTION_BACK_TO_GRID).setVisible(currentMode != Mode.GRID);
@@ -166,6 +359,43 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
             } else {
                 llmSwitch.setSingleLabel("GPT-5-mini");
             }
+        }
+
+        // Pencil on preview — only visible in browse mode
+        getMainPanel().getButtonByFunction(FUNCTION_EDIT_PENCIL).setVisible(isBrowse && isGridMode);
+
+        // Profile buttons (all categories)
+        getMainPanel().getButtonByFunction(FUNCTION_NEW_PROFILE).setVisible(isGridMode);
+        // Reset: only in edit mode for built-in AND only if modified
+        getMainPanel().getButtonByFunction(FUNCTION_RESET).setVisible(isGridMode && !isBrowse
+                && characterEditMode == CharacterEditMode.BUILTIN && isBuiltInModified());
+        getMainPanel().getButtonByFunction(FUNCTION_DELETE).setVisible(isGridMode && !isBrowse
+                && characterEditMode == CharacterEditMode.PROFILE);
+    }
+
+    private boolean isBuiltInModified() {
+        if (characterEditMode != CharacterEditMode.BUILTIN || editBuiltInName == null) return false;
+        EnumInterface original = findOriginalBuiltIn(editBuiltInName);
+        if (original == null) return false;
+        String currentName = nameField != null ? nameField.getCurString().trim() : "";
+        String currentDetails = detailsField != null ? detailsField.getCurString().trim() : "";
+        return !currentName.equals(original.getDisplayName()) || !currentDetails.equals(original.getDisplayDetails());
+    }
+
+    private EnumInterface findOriginalBuiltIn(String name) {
+        for (EnumInterface e : getEnumValuesForCategory()) {
+            if (e.getName().equals(name)) return e;
+        }
+        return null;
+    }
+
+    private EnumInterface[] getEnumValuesForCategory() {
+        String category = getProfileCategory();
+        switch (category) {
+            case "universe": return Universe.values();
+            case "places": return Places.values();
+            case "objectives": return Objectives.values();
+            default: return MainCharacter.values();
         }
     }
 
@@ -227,33 +457,46 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     @Override
     public void mousePressed(int x, int y, boolean isRightButton) {
         if (isGenerating) return;
+        boolean isBrowse = browseMode;
 
-        if (this.nameField.mousePressed(x, y)) {
-            this.nameField.setSelect(true);
-            this.detailsField.setSelect(false);
-            this.imagePromptField.setSelect(false);
-            this.activeField = this.nameField;
-            return;
-        }
-        if (this.detailsField.mousePressed(x, y)) {
-            this.detailsField.setSelect(true);
-            this.nameField.setSelect(false);
-            this.imagePromptField.setSelect(false);
-            this.activeField = this.detailsField;
-            return;
-        }
-        if (currentMode == Mode.GENERATE && this.imagePromptField.mousePressed(x, y)) {
-            this.imagePromptField.setSelect(true);
-            this.nameField.setSelect(false);
-            this.detailsField.setSelect(false);
-            this.activeField = this.imagePromptField;
-            return;
+        // In browse mode, text fields are not editable
+        if (!isBrowse) {
+            if (this.nameField.mousePressed(x, y)) {
+                this.nameField.setSelect(true);
+                this.detailsField.setSelect(false);
+                this.imagePromptField.setSelect(false);
+                this.activeField = this.nameField;
+                return;
+            }
+            if (this.detailsField.mousePressed(x, y)) {
+                this.detailsField.setSelect(true);
+                this.nameField.setSelect(false);
+                this.imagePromptField.setSelect(false);
+                this.activeField = this.detailsField;
+                return;
+            }
+            if (currentMode == Mode.GENERATE && this.imagePromptField.mousePressed(x, y)) {
+                this.imagePromptField.setSelect(true);
+                this.nameField.setSelect(false);
+                this.detailsField.setSelect(false);
+                this.activeField = this.imagePromptField;
+                return;
+            }
         }
 
         if (currentMode == Mode.GRID) {
             int gridIndex = getGridIndexAt(x, y);
-            if (gridIndex >= 0 && gridIndex < this.totalImages) {
-                this.selectedImageIndex = gridIndex;
+            if (isBrowse) {
+                // Browse mode: select profile
+                if (browseOptions != null && gridIndex >= 0 && gridIndex < browseOptions.size()) {
+                    browseIndex = gridIndex;
+                    updateBrowseDisplay();
+                }
+            } else {
+                // Edit mode: select image
+                if (gridIndex >= 0 && gridIndex < this.totalImages) {
+                    this.selectedImageIndex = gridIndex;
+                }
             }
         } else if (currentMode == Mode.GENERATE) {
             int styleIdx = getStyleIndexAt(x, y);
@@ -298,6 +541,8 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         int rows;
         if (currentMode == Mode.MANAGE) {
             rows = (getCustomImageCount() + GRID_COLS - 1) / GRID_COLS;
+        } else if (browseMode && browseOptions != null) {
+            rows = (browseOptions.size() + GRID_COLS - 1) / GRID_COLS;
         } else {
             rows = (totalImages + GRID_COLS - 1) / GRID_COLS;
         }
@@ -308,7 +553,8 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     }
 
     private int getCustomImageCount() {
-        return customEntity != null ? customEntity.getCustomImageCount() : 0;
+        CustomImageManager mgr = getMainPanel().getImageManagerFor(getProfileCategory());
+        return mgr != null ? mgr.getCount() : 0;
     }
 
 
@@ -348,7 +594,10 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     }
 
     private void handleManageClick(int mouseX, int mouseY) {
-        if (customEntity == null || customEntity.getCustomImageManager() == null) return;
+        String category = getProfileCategory();
+        CustomImageManager mgr = getMainPanel().getImageManagerFor(category);
+        int builtInCount = getBuiltInImageCount(category);
+        if (mgr == null) return;
 
         int relX = mouseX - GRID_START_X;
         int relY = mouseY - GRID_START_Y + scrollOffset;
@@ -363,16 +612,14 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         int customCount = getCustomImageCount();
         if (index >= customCount) return;
 
-        // Check if click is on the delete X (top-right 24x24 area of the sprite)
         int spriteX = GRID_START_X + col * (GRID_SPRITE_SIZE + GRID_PADDING);
         int spriteY = GRID_START_Y + row * (GRID_SPRITE_SIZE + GRID_PADDING) - scrollOffset;
         int deleteX = spriteX + GRID_SPRITE_SIZE - 24;
         int deleteY = spriteY;
 
         if (mouseX >= deleteX && mouseX <= deleteX + 24 && mouseY >= deleteY && mouseY <= deleteY + 24) {
-            int builtInCount = customEntity.getBuiltInImageCount();
-            customEntity.getCustomImageManager().deleteImage(index);
-            totalImages = customEntity.getTotalImages();
+            mgr.deleteImage(index);
+            totalImages = getCharacterTotalImages();
 
             if (selectedImageIndex >= builtInCount + index) {
                 if (selectedImageIndex > builtInCount) {
@@ -394,10 +641,7 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     }
 
     private TextureRegion getTextureByIndex(int index) {
-        if (this.customEntity != null) {
-            return this.customEntity.getTextureByIndex(index);
-        }
-        return AssetLoader.maincharacterTextureRegion[0];
+        return getCharacterTextureByIndex(index);
     }
 
     @Override
@@ -426,7 +670,7 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
             case FUNCTION_BACK_TO_GRID:
                 currentMode = Mode.GRID;
                 scrollOffset = 0;
-                totalImages = customEntity != null ? customEntity.getTotalImages() : 60;
+                totalImages = getCharacterTotalImages();
                 setNeededButtonsVisible();
                 break;
             case FUNCTION_DO_GENERATE:
@@ -441,16 +685,25 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
                     imageLlm = com.apogames.aistories.game.main.ChatGPTIO.LLM_MODEL_MINI;
                 }
                 break;
+            case FUNCTION_NEW_PROFILE:
+                switchToNewProfileMode();
+                break;
+            case FUNCTION_RESET:
+                resetBuiltIn();
+                break;
+            case FUNCTION_DELETE:
+                deleteProfile();
+                break;
+            case FUNCTION_EDIT_PENCIL:
+                enterEditModeFromBrowse();
+                break;
         }
     }
 
     private void doGenerate() {
-        if (isGenerating || customEntity == null) return;
+        if (isGenerating) return;
 
         String name = this.nameField.getCurString().trim();
-        if (name.isEmpty()) {
-            name = Localization.getInstance().getCommon().get(this.customEntity.getName());
-        }
 
         String description = this.imagePromptField.getCurString().trim();
         if (description.isEmpty()) {
@@ -460,6 +713,10 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         ImageStyle style = ImageStyle.values()[selectedStyleIndex];
         String llm = this.imageLlm;
 
+        final CustomImageManager mgr = getMainPanel().getImageManagerFor(getProfileCategory());
+
+        if (mgr == null) return;
+
         isGenerating = true;
         generateError = null;
         setNeededButtonsVisible();
@@ -467,11 +724,9 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         ImageGenerationIO.generateImage(name, description, style, llm, new ImageGenerationIO.ImageCallback() {
             @Override
             public void onSuccess(byte[] pngData) {
-                if (customEntity.getCustomImageManager() != null) {
-                    customEntity.getCustomImageManager().addImage(pngData);
-                    totalImages = customEntity.getTotalImages();
-                    selectedImageIndex = totalImages - 1;
-                }
+                mgr.addImage(pngData);
+                totalImages = getCharacterTotalImages();
+                selectedImageIndex = totalImages - 1;
                 isGenerating = false;
                 currentMode = Mode.GRID;
                 scrollOffset = 0;
@@ -488,18 +743,145 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     }
 
     private void confirm() {
-        if (this.customEntity != null) {
-            String name = this.nameField.getCurString().trim();
-            if (name.isEmpty()) {
-                name = Localization.getInstance().getCommon().get(this.customEntity.getName());
-            }
-            this.customEntity.setCustomName(name);
-            this.customEntity.setCustomDetails(this.detailsField.getCurString().trim());
-            this.customEntity.setImageIndex(this.selectedImageIndex);
+        if (browseMode) {
+            confirmBrowse();
+            return;
+        }
+        confirmCharacter();
+    }
 
-            getMainPanel().saveCustomEntityPreferences();
+    private void confirmBrowse() {
+        if (browseOptions != null && browseIndex >= 0 && browseIndex < browseOptions.size()) {
+            getMainPanel().setPendingCharacterSelection(browseOptions.get(browseIndex));
         }
         goBack();
+    }
+
+    private void confirmCharacter() {
+        MainPanel mp = getMainPanel();
+        String category = getProfileCategory();
+        CustomImageManager mgr = mp.getImageManagerFor(category);
+        String name = nameField.getCurString().trim();
+        String details = detailsField.getCurString().trim();
+        EnumInterface savedProfile = null;
+
+        switch (characterEditMode) {
+            case BUILTIN: {
+                CharacterProfile override = mp.getOverrideFor(category, editBuiltInName);
+                if (override == null) {
+                    override = new CharacterProfile();
+                    override.setCategory(category);
+                    override.setBuiltInName(editBuiltInName);
+                    override.setCustomImageManager(mgr);
+                }
+                if (name.isEmpty() && editTarget != null) {
+                    name = editTarget.getDisplayName();
+                }
+                override.setDisplayName(name);
+                override.setDisplayDetails(details);
+                override.setImageIndex(selectedImageIndex);
+                mp.saveOverride(category, override);
+                savedProfile = override;
+                break;
+            }
+            case PROFILE: {
+                if (workingProfile != null) {
+                    if (name.isEmpty()) name = workingProfile.getDisplayName();
+                    workingProfile.setDisplayName(name);
+                    workingProfile.setDisplayDetails(details);
+                    workingProfile.setImageIndex(selectedImageIndex);
+                    mp.saveProfilesForCategory(category);
+                    savedProfile = workingProfile;
+                }
+                break;
+            }
+            case NEW: {
+                if (name.isEmpty()) return;
+                CharacterProfile profile = new CharacterProfile();
+                profile.setCategory(category);
+                profile.setId(System.currentTimeMillis());
+                profile.setDisplayName(name);
+                profile.setDisplayDetails(details);
+                profile.setImageIndex(selectedImageIndex);
+                profile.setCustomImageManager(mgr);
+                mp.addProfile(category, profile);
+                savedProfile = profile;
+                break;
+            }
+        }
+
+        // Return to browse mode with the saved item selected
+        if (savedProfile != null) {
+            returnToBrowseWithSelection(savedProfile);
+        } else {
+            goBack();
+        }
+    }
+
+    private void returnToBrowseWithSelection(EnumInterface savedProfile) {
+        // Rebuild browse options with latest profiles
+        EnumInterface[] enumValues = getEnumValuesForCategory();
+        String category = getProfileCategory();
+        this.browseOptions = new java.util.ArrayList<>(getMainPanel().buildEffectiveOptions(category, enumValues));
+        this.totalImages = this.browseOptions.size();
+        this.browseMode = true;
+        this.browseIndex = 0;
+        for (int i = 0; i < browseOptions.size(); i++) {
+            if (browseOptions.get(i) == savedProfile || browseOptions.get(i).getName().equals(savedProfile.getName())) {
+                this.browseIndex = i;
+                break;
+            }
+        }
+        updateBrowseDisplay();
+        this.scrollOffset = 0;
+        this.currentMode = Mode.GRID;
+        setNeededButtonsVisible();
+    }
+
+    private void resetBuiltIn() {
+        if (characterEditMode == CharacterEditMode.BUILTIN && editBuiltInName != null) {
+            getMainPanel().removeOverride(getProfileCategory(), editBuiltInName);
+        }
+        // Find original built-in and return to browse
+        EnumInterface original = findOriginalBuiltIn(editBuiltInName);
+        if (original != null) {
+            returnToBrowseWithSelection(original);
+        } else {
+            goBack();
+        }
+    }
+
+    private void deleteProfile() {
+        if (characterEditMode == CharacterEditMode.PROFILE && workingProfile != null) {
+            getMainPanel().deleteProfile(getProfileCategory(), workingProfile.getId());
+        }
+        // Return to browse (first item since deleted item is gone)
+        EnumInterface[] enumValues = getEnumValuesForCategory();
+        String category = getProfileCategory();
+        this.browseOptions = new java.util.ArrayList<>(getMainPanel().buildEffectiveOptions(category, enumValues));
+        this.totalImages = this.browseOptions.size();
+        this.browseMode = true;
+        this.browseIndex = 0;
+        updateBrowseDisplay();
+        this.scrollOffset = 0;
+        this.currentMode = Mode.GRID;
+        setNeededButtonsVisible();
+    }
+
+    private void switchToNewProfileMode() {
+        this.browseMode = false;
+        this.characterEditMode = CharacterEditMode.NEW;
+        this.workingProfile = null;
+        this.editTarget = null;
+        this.editBuiltInName = null;
+        this.totalImages = getCharacterTotalImages();
+        this.nameField.setCurString("");
+        this.nameField.setPosition(0);
+        this.detailsField.setCurString("");
+        this.detailsField.setPosition(0);
+        this.selectedImageIndex = 0;
+        this.scrollOffset = 0;
+        setNeededButtonsVisible();
     }
 
     @Override
@@ -529,6 +911,10 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         if (this.imagePromptField != null) {
             this.imagePromptField.think((int) delta);
         }
+        // Dynamically update reset button visibility based on current field values
+        if (!browseMode && characterEditMode == CharacterEditMode.BUILTIN && currentMode == Mode.GRID) {
+            getMainPanel().getButtonByFunction(FUNCTION_RESET).setVisible(isBuiltInModified());
+        }
     }
 
     @Override
@@ -552,9 +938,11 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
 
         // Selection highlight (grid mode) — ShapeRenderer before SpriteBatch
         if (currentMode == Mode.GRID) {
+            boolean isBrowse = browseMode;
+            int selIdx = isBrowse ? browseIndex : selectedImageIndex;
             getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
-            int selCol = this.selectedImageIndex % GRID_COLS;
-            int selRow = this.selectedImageIndex / GRID_COLS;
+            int selCol = selIdx % GRID_COLS;
+            int selRow = selIdx / GRID_COLS;
             float selY = GRID_START_Y + selRow * (GRID_SPRITE_SIZE + GRID_PADDING) - scrollOffset;
             if (selY >= GRID_START_Y - GRID_SPRITE_SIZE && selY < Constants.GAME_HEIGHT) {
                 getMainPanel().getRenderer().setColor(Constants.COLOR_YELLOW[0], Constants.COLOR_YELLOW[1], Constants.COLOR_YELLOW[2], 1f);
@@ -587,7 +975,13 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         getMainPanel().drawString(Localization.getInstance().getCommon().get("custom_editor_details"), 30, DETAILS_LABEL_Y, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);
 
         // Preview image — larger
-        TextureRegion previewImage = getTextureByIndex(this.selectedImageIndex);
+        boolean isBrowseRender = browseMode;
+        TextureRegion previewImage;
+        if (isBrowseRender && browseOptions != null && browseIndex >= 0 && browseIndex < browseOptions.size()) {
+            previewImage = browseOptions.get(browseIndex).getImage();
+        } else {
+            previewImage = getTextureByIndex(this.selectedImageIndex);
+        }
         if (previewImage != null) {
             float previewX = LEFT_PANEL_X + LEFT_PANEL_W / 2f - PREVIEW_SIZE / 2f;
             float previewY = 400;
@@ -648,8 +1042,29 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         // Grid label — SpriteBatch is active
         getMainPanel().drawString(Localization.getInstance().getCommon().get("custom_editor_image"), GRID_START_X, LABEL_Y, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);
 
-        // Grid images
-        renderGridImages(this.totalImages, false);
+        if (browseMode) {
+            renderBrowseGrid();
+        } else {
+            renderGridImages(this.totalImages, false);
+        }
+    }
+
+    private void renderBrowseGrid() {
+        if (browseOptions == null) return;
+        int count = browseOptions.size();
+        for (int i = 0; i < count; i++) {
+            int col = i % GRID_COLS;
+            int row = i / GRID_COLS;
+            float spriteX = GRID_START_X + col * (GRID_SPRITE_SIZE + GRID_PADDING);
+            float spriteY = GRID_START_Y + row * (GRID_SPRITE_SIZE + GRID_PADDING) - scrollOffset;
+
+            if (spriteY > Constants.GAME_HEIGHT || spriteY + GRID_SPRITE_SIZE < GRID_START_Y) continue;
+
+            TextureRegion tex = browseOptions.get(i).getImage();
+            if (tex != null) {
+                getMainPanel().spriteBatch.draw(tex, spriteX, spriteY, GRID_SPRITE_SIZE, GRID_SPRITE_SIZE);
+            }
+        }
     }
 
     private void renderGridImages(int count, boolean isManageMode) {
@@ -663,8 +1078,9 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
             if (spriteY > Constants.GAME_HEIGHT || spriteY + GRID_SPRITE_SIZE < GRID_START_Y) continue;
 
             TextureRegion tex;
-            if (isManageMode && customEntity != null && customEntity.getCustomImageManager() != null) {
-                tex = customEntity.getCustomImageManager().getTexture(i);
+            if (isManageMode) {
+                CustomImageManager mgr = getMainPanel().getImageManagerFor(getProfileCategory());
+                tex = mgr != null ? mgr.getTexture(i) : null;
             } else {
                 tex = getTextureByIndex(i);
             }
@@ -789,8 +1205,23 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     }
 
     private String getEditorTitle() {
-        if (this.customEntity != null) {
-            String key = "custom_editor_title_" + this.customEntity.getEnumName();
+        if (browseMode) {
+            if (browseCategory != null) {
+                String key = "custom_editor_title_browse_" + browseCategory;
+                try {
+                    return Localization.getInstance().getCommon().get(key);
+                } catch (Exception e) { }
+            }
+            return Localization.getInstance().getCommon().get("custom_editor_title_browse");
+        }
+        {
+            String key;
+            switch (characterEditMode) {
+                case BUILTIN: key = "custom_editor_title_builtin"; break;
+                case PROFILE: key = "custom_editor_title_profile"; break;
+                case NEW: key = "custom_editor_title_new"; break;
+                default: key = "custom_editor_title"; break;
+            }
             try {
                 return Localization.getInstance().getCommon().get(key);
             } catch (Exception e) {

@@ -54,7 +54,7 @@ public class GameScreen implements Screen, InputProcessor {
 
     public static boolean headless = false;
 
-    private final OrthographicCamera cam;
+    protected final OrthographicCamera cam;
     private final ArrayList<GridPoint2> clickReleasedArray = new ArrayList<GridPoint2>();
     private final ArrayList<GridPoint2> clickDraggedArray = new ArrayList<GridPoint2>();
     private final ArrayList<GridPoint2> clickPressedArray = new ArrayList<GridPoint2>();

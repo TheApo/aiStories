@@ -1,5 +1,7 @@
 package com.apogames.aistories.game.objects;
 
+import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -25,14 +27,18 @@ public class GameObjectives {
         this.universe = Universe.getRandom();
     }
 
-    public void shuffleWithCustoms(CustomEntity customMain, CustomEntity customSupport,
+    public void shuffleWithCustoms(List<EnumInterface> characterOptions,
                                     CustomEntity customUniverse, CustomEntity customPlaces,
                                     CustomEntity customObjectives) {
-        this.mainCharacter = pickRandom(MainCharacter.values(), customMain);
-        this.supportingCharacter = pickRandom(SupportingCharacter.values(), customSupport);
+        this.mainCharacter = pickRandom(characterOptions);
+        this.supportingCharacter = pickRandom(characterOptions);
         this.universe = pickRandom(Universe.values(), customUniverse);
         this.places = pickRandom(Places.values(), customPlaces);
         this.objectives = pickRandom(Objectives.values(), customObjectives);
+    }
+
+    private static EnumInterface pickRandom(List<EnumInterface> options) {
+        return options.get((int) (options.size() * Math.random()));
     }
 
     private static EnumInterface pickRandom(EnumInterface[] values, CustomEntity custom) {

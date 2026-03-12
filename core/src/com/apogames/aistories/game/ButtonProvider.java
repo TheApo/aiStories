@@ -37,6 +37,7 @@ import com.apogames.aistories.game.settings.SongSettingsScreen;
 import com.apogames.aistories.game.settings.StorySettingsScreen;
 import com.apogames.asset.AssetLoader;
 import com.apogames.entity.*;
+import com.apogames.entity.ApoButtonIcon;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 
 public class ButtonProvider {
@@ -112,7 +113,7 @@ public class ButtonProvider {
             int settingsSize = 58;
             x = Constants.GAME_WIDTH / 2 + 450 / 2 + 20;
             y = Constants.GAME_HEIGHT - 100 + (64 - settingsSize) / 2;
-            button = new ApoButtonEditIcon(x, y, settingsSize, function, Constants.COLOR_PURPLE, Constants.COLOR_WHITE);
+            button = new ApoButtonIcon(x, y, settingsSize, function, Constants.COLOR_PURPLE, Constants.COLOR_WHITE, ApoButtonIcon.IconType.EDIT);
             this.game.getButtons().add(button);
 
             text = "LLM";
@@ -401,6 +402,48 @@ public class ButtonProvider {
             y = Constants.GAME_HEIGHT - 64 - 40 - 75;
             button = new ApoButtonSwitch(x, y, width, height, function, Constants.COLOR_WHITE, Constants.COLOR_BLACK);
             ((ApoButtonSwitch) button).setLabels("GPT-5-mini", "Gemini-3");
+            button.setFont(AssetLoader.font20);
+            this.game.getButtons().add(button);
+
+            // Character editor: pencil on preview image (switches from browse to edit mode)
+            function = CustomEntityEditor.FUNCTION_EDIT_PENCIL;
+            int pencilSize = 56;
+            // Preview is at x=90, y=400, size=260 → top-right corner
+            x = 90 + 260 - pencilSize + 8;
+            y = 400 + 260 - pencilSize + 8;
+            button = new ApoButtonIcon(x, y, pencilSize, function, Constants.COLOR_WHITE, Constants.COLOR_BLACK, ApoButtonIcon.IconType.EDIT);
+            this.game.getButtons().add(button);
+
+            // Character editor: +Neu button (far left, same area as Manage which is hidden in GRID mode)
+            text = "+Neu";
+            function = CustomEntityEditor.FUNCTION_NEW_PROFILE;
+            width = 150;
+            height = 50;
+            x = 15;
+            y = 15;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "custom_editor_new_profile");
+            button.setFont(AssetLoader.font20);
+            this.game.getButtons().add(button);
+
+            // Character editor: Reset button (built-in override, next to +Neu)
+            text = "Reset";
+            function = CustomEntityEditor.FUNCTION_RESET;
+            width = 200;
+            height = 50;
+            x = 180;
+            y = 15;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "custom_editor_reset");
+            button.setFont(AssetLoader.font20);
+            this.game.getButtons().add(button);
+
+            // Character editor: Delete button (custom profile, same position as Reset)
+            text = "Delete";
+            function = CustomEntityEditor.FUNCTION_DELETE;
+            width = 200;
+            height = 50;
+            x = 180;
+            y = 15;
+            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "custom_editor_delete");
             button.setFont(AssetLoader.font20);
             this.game.getButtons().add(button);
 
