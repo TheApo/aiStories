@@ -197,6 +197,8 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
             return;
         }
         promptField.setSelect(false);
+        Gdx.input.setOnscreenKeyboardVisible(false);
+        MainPanel.clearActiveInput();
 
         // Toggle objectives button
         if (toggleButton.intersects(x, y)) {

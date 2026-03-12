@@ -511,6 +511,8 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         this.detailsField.setSelect(false);
         this.imagePromptField.setSelect(false);
         this.activeField = null;
+        Gdx.input.setOnscreenKeyboardVisible(false);
+        MainPanel.clearActiveInput();
     }
 
     @Override

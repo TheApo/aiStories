@@ -201,7 +201,7 @@ public class ChatGPTIO {
         // Generation config
         Map<String, Object> genConfig = new HashMap<>();
         genConfig.put("temperature", 1);
-        genConfig.put("maxOutputTokens", 4096);
+        genConfig.put("maxOutputTokens", 16384);
         params.put("generationConfig", genConfig);
 
         String geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + llm + ":generateContent?key=" + GEMINI_API_KEY;

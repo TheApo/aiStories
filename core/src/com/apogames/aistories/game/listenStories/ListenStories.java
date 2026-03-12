@@ -67,6 +67,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private ArrayList<Integer> choosenImageStory = new ArrayList<>();
     private int choosenReadStory = -1;
     private boolean isSong = false;
+    private GameObjectives savedObjectives;
     private int songVariantIndex = 0;
     private FileHandle[] songVariantHandles;
 
@@ -150,6 +151,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             loadProperties();
         }
 
+        this.savedObjectives = this.getMainPanel().getPromptObject().getGameObjectives().copy();
+
         FontSize.refreshAll();
         this.getMainPanel().reInit();
 
@@ -159,6 +162,22 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.setButtonsVisibility();
         if (this.running == Running.NONE) {
             this.reloadFileHandler();
+        } else {
+            if (this.textArea == null) {
+                this.textArea = new TextArea(0, 0, bookRenderer.getTextAreaWidth(), BookRenderer.getPageHeight(), "TextArea", "");
+            } else {
+                this.textArea.setHeight(BookRenderer.getPageHeight());
+            }
+            this.textArea.setFont(fontSize.getFont());
+            String promptText = this.getMainPanel().getTextArea().getText();
+            if (promptText != null && !promptText.isEmpty()) {
+                this.textArea.setText(promptText);
+                this.textEditor.setText(promptText);
+                this.textEditor.setFont(this.fontSize.getFont());
+                processAndLayoutChapters();
+                this.textEditor.setDisplayData(this.textArea.getMyText(), new int[0], new java.util.HashSet<>());
+                this.textEditor.setActive(false);
+            }
         }
     }
 
@@ -881,9 +900,13 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         }
         if (this.textEditor.isActive() && !isRightButton) {
             int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
-            this.textEditor.handleClick(x, y, this.fontSize, this.currentSpread,
+            boolean handled = this.textEditor.handleClick(x, y, this.fontSize, this.currentSpread,
                     rowsPerPage, this.fontSize.getNext(1).getFont(),
                     this.bookRenderer.getChapterLines());
+            if (!handled) {
+                Gdx.input.setOnscreenKeyboardVisible(false);
+                MainPanel.clearActiveInput();
+            }
         }
     }
 
@@ -1343,6 +1366,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         if (this.music != null) {
             this.music.dispose();
         }
+        if (this.savedObjectives != null) {
+            this.getMainPanel().getPromptObject().getGameObjectives().copyFrom(this.savedObjectives);
+        }
         getMainPanel().changeToMenu();
     }
 
@@ -1420,6 +1446,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                     updatePageButtonVisibility();
                 }
             } else {
+                this.running = Running.NONE;
+                if (this.nextRunning != null && this.nextRunning == Running.NONE) {
+                    this.nextRunning = null;
+                }
                 this.fontSize = FontSize.FONT_25;
                 this.setTextInTextArea(text);
 

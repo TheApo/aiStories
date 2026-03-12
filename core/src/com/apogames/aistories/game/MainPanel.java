@@ -37,17 +37,22 @@ public class MainPanel extends GameScreen {
 
     public static void setKeyboardPixelHeight(int height) {
         keyboardPixelHeight = height;
+        Gdx.graphics.requestRendering();
     }
 
     public static void setActiveInput(float y, float height) {
         activeInputY = y;
         activeInputHeight = height;
+        Gdx.graphics.requestRendering();
     }
 
     public static void clearActiveInput() {
         activeInputY = -1;
         activeInputHeight = 0;
+        Gdx.graphics.requestRendering();
     }
+
+    private int appliedKeyboardOffset = 0;
 
     private int calculateKeyboardOffset() {
         if (keyboardPixelHeight <= 0 || activeInputY < 0) return 0;
@@ -56,7 +61,21 @@ public class MainPanel extends GameScreen {
         float keyboardTopY = Constants.GAME_HEIGHT - keyboardGameHeight;
         float inputBottomY = activeInputY + activeInputHeight;
         if (inputBottomY <= keyboardTopY) return 0;
-        return (int) (inputBottomY - keyboardTopY + 15);
+        int offset = (int) (inputBottomY - keyboardTopY + 15);
+        int maxOffset = (int) activeInputY;
+        return Math.min(offset, maxOffset);
+    }
+
+    private void updateKeyboardCameraOffset() {
+        int newOffset = calculateKeyboardOffset();
+        if (newOffset != appliedKeyboardOffset) {
+            cam.position.y -= appliedKeyboardOffset;
+            cam.position.y += newOffset;
+            appliedKeyboardOffset = newOffset;
+            cam.update();
+            spriteBatch.setProjectionMatrix(cam.combined);
+            getRenderer().setProjectionMatrix(cam.combined);
+        }
     }
 
     private static final String PREFS_NAME = "AIStoriesCustomEntityPreferences";
@@ -565,32 +584,33 @@ public class MainPanel extends GameScreen {
     }
 
     public void think(final float delta) {
+        updateKeyboardCameraOffset();
         super.think(delta);
         if (model != null) model.think(delta);
     }
 
     public void render(float delta) {
+        updateKeyboardCameraOffset();
         super.render(delta);
 
         if (model != null) {
-            int offsetY = calculateKeyboardOffset();
-            if (offsetY != 0) {
-                cam.position.y -= offsetY;
-                cam.update();
-                spriteBatch.setProjectionMatrix(cam.combined);
-                getRenderer().setProjectionMatrix(cam.combined);
-            }
-
             model.render();
 
-            if (offsetY != 0) {
-                cam.position.y += offsetY;
+            if (appliedKeyboardOffset != 0) {
+                cam.position.y -= appliedKeyboardOffset;
                 cam.update();
                 spriteBatch.setProjectionMatrix(cam.combined);
                 getRenderer().setProjectionMatrix(cam.combined);
             }
 
             model.drawOverlay();
+
+            if (appliedKeyboardOffset != 0) {
+                cam.position.y += appliedKeyboardOffset;
+                cam.update();
+                spriteBatch.setProjectionMatrix(cam.combined);
+                getRenderer().setProjectionMatrix(cam.combined);
+            }
         }
         this.spriteBatch.begin();
         this.drawString(String.valueOf(Gdx.graphics.getFramesPerSecond()), 5, 5, Constants.COLOR_PURPLE, AssetLoader.font15, DrawString.BEGIN, false, false);

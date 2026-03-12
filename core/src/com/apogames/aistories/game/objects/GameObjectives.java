@@ -47,6 +47,20 @@ public class GameObjectives {
         return index < values.length ? values[index] : custom;
     }
 
+    public void copyFrom(GameObjectives other) {
+        this.mainCharacter = other.mainCharacter;
+        this.supportingCharacter = other.supportingCharacter;
+        this.objectives = other.objectives;
+        this.places = other.places;
+        this.universe = other.universe;
+    }
+
+    public GameObjectives copy() {
+        GameObjectives copy = new GameObjectives();
+        copy.copyFrom(this);
+        return copy;
+    }
+
     public void refresh() {
         if (this.mainCharacter != null) this.mainCharacter.refresh();
         if (this.supportingCharacter != null) this.supportingCharacter.refresh();

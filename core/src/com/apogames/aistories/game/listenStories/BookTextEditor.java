@@ -382,6 +382,8 @@ public class BookTextEditor {
         setCursorPos(lineStarts[globalLine] + col);
         clearSelection();
         showCursor();
+        Gdx.input.setOnscreenKeyboardVisible(true);
+        MainPanel.setActiveInput(BookRenderer.BOOK_Y, BookRenderer.getBookHeight());
         Gdx.graphics.requestRendering();
         return true;
     }

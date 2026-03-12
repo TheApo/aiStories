@@ -17,7 +17,7 @@ public class SongPrompt {
         return "Erstelle ein " + length + " im Stil von " + style + " fuer Hoerer im Alter von " + age + ".\n" +
                 ageTone + "\n" +
                 ageStructure + "\n" +
-                "Der Text soll sich reimen (AABB Schema), eingaengig und singbar sein.";
+                "Der Text muss sich reimen (AABB Schema): Reimpaare muessen die gleiche Silbenanzahl haben (gleiches Versmass). Eingaengig und singbar.";
     }
 
     public static String buildFullPrompt(SongSettings settings, GameObjectives objectives) {
@@ -59,7 +59,7 @@ public class SongPrompt {
                 + " fuer " + settings.getAgeDescription() + ". "
                 + getCompactAgeTone(settings.getAgeGroup()) + " "
                 + getCompactStructure(settings.getAgeGroup()) + " "
-                + "Text muss sich reimen (AABB), eingaengig und singbar sein.";
+                + "Text muss sich reimen (AABB), Reimpaare gleiche Silbenanzahl, eingaengig und singbar.";
     }
 
     public static String buildObjectivesText(GameObjectives objectives) {
@@ -92,11 +92,15 @@ public class SongPrompt {
         sb.append("WICHTIG: Halte dich EXAKT an die oben angegebene Struktur und Reihenfolge. ");
         sb.append("Nicht mehr und nicht weniger Abschnitte als angegeben. ");
         sb.append("Der [Chorus] hat immer den gleichen Text und wird nach jeder Strophe wiederholt. ");
-        sb.append("Formatiere jeden Abschnitt mit dem passenden Tag auf eigener Zeile.\n");
-        sb.append("Der Text muss sich reimen (AABB Schema), eingaengig und singbar sein.\n");
-        sb.append("Jede Zeile muss singbar sein: maximal 5-12 Woerter pro Zeile. ");
-        sb.append("Keine langen Schachtelsaetze. Schreibe so, wie man es natuerlich singen wuerde.\n");
-        sb.append("Schreibe KEINE Reimschema-Markierungen wie (A), (B) oder aehnliches hinter die Zeilen.\n\n");
+        sb.append("Formatiere jeden Abschnitt mit dem passenden Tag auf eigener Zeile.\n\n");
+
+        sb.append("REIMSCHEMA UND VERSMASS (ZWINGEND EINHALTEN):\n");
+        sb.append("- Paarreim AABB: Jeweils zwei aufeinanderfolgende Zeilen muessen sich reimen.\n");
+        sb.append("- Gleiches Versmass: Zwei Zeilen die sich reimen muessen die gleiche Silbenanzahl haben (z.B. beide 8 Silben).\n");
+        sb.append("- Zaehle die Silben jeder Zeile und stelle sicher dass Reimpaare gleich lang sind.\n");
+        sb.append("- Beispiel: 'Die Sonne scheint so warm und hell' (8 Silben) / 'Ich mag den Tag, er ist so schnell' (8 Silben).\n");
+        sb.append("- Jede Zeile muss singbar sein: maximal 10 Woerter pro Zeile, keine langen Schachtelsaetze.\n");
+        sb.append("- Schreibe KEINE Reimschema-Markierungen wie (A), (B) hinter die Zeilen.\n\n");
 
         sb.append("Gib NUR den Liedtext aus, keine Erklaerungen oder Kommentare.\n\n");
 

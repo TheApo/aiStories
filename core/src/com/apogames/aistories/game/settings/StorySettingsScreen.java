@@ -146,6 +146,8 @@ public class StorySettingsScreen extends SequentiallyThinkingScreenModel {
             return;
         }
         promptField.setSelect(false);
+        Gdx.input.setOnscreenKeyboardVisible(false);
+        MainPanel.clearActiveInput();
 
         int typeIndex = getTileIndex(x, y, ROW_Y_TYPE, StorySettings.StoryType.values().length, getTypeTileWidth());
         if (typeIndex >= 0) {
