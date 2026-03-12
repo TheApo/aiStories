@@ -1501,8 +1501,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         // Word highlight (between page background and text)
         renderWordHighlight();
 
-        // Editor selection highlight
-        renderEditorSelection();
+        // Editor selection + cursor
+        if (this.textEditor.isActive()) {
+            int editorRowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+            this.textEditor.setRenderContext(this.fontSize, this.currentSpread, editorRowsPerPage,
+                    this.fontSize.getNext(1).getFont(), this.bookRenderer.getChapterLines());
+        }
 
         // Story and audio info above book
         getMainPanel().spriteBatch.begin();
@@ -1539,14 +1543,11 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 bookRenderer.renderPageText(displayLines, rightStart, rowsPerPage, this.fontSize, false);
             }
 
-            // Editor cursor (between text and page numbers)
+            // Editor selection + cursor
             if (this.textEditor.isActive() && !pageAnimation.isAnimating()) {
                 getMainPanel().spriteBatch.end();
                 Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
-                this.textEditor.renderCursor(getMainPanel().getRenderer(), this.fontSize,
-                        this.currentSpread, rowsPerPage,
-                        this.fontSize.getNext(1).getFont(),
-                        this.bookRenderer.getChapterLines());
+                this.textEditor.render(getMainPanel(), 0, 0);
                 Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
                 getMainPanel().spriteBatch.begin();
             }
@@ -1626,17 +1627,6 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
     }
 
-    private void renderEditorSelection() {
-        if (!this.textEditor.isActive() || !this.textEditor.hasSelection()) return;
-
-        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
-        Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
-        this.textEditor.renderSelection(getMainPanel().getRenderer(), this.fontSize,
-                this.currentSpread, rowsPerPage,
-                this.fontSize.getNext(1).getFont(),
-                this.bookRenderer.getChapterLines());
-        Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
-    }
 
     private void renderButtonBackgrounds() {
         if (this.running != Running.NONE) return;

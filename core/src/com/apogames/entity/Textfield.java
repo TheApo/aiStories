@@ -24,18 +24,18 @@ public class Textfield extends ApoButton {
     private final float[] MOUSE_OVER_COLOR = new float[]{255 / 255f, 255 / 255f, 100 / 255f, 1f};
     private final float[] SELECTED_COLOR = new float[]{0 / 255f, 150 / 255f, 255 / 255f, 1f};
     private final int MAX_LENGTH = 100;
-    private final int TIME_LINE = 700;
-    private String curString;
-    private int position;
-    private int time;
-    private boolean bLineOn;
-    private BitmapFont myFont;
+    protected static final int TIME_LINE = 700;
+    protected String curString;
+    protected int position;
+    protected int time;
+    protected boolean bLineOn;
+    protected BitmapFont myFont;
     private boolean bEnabled;
-    private int maxLength;
-    private GridPoint2 selectedPosition;
+    protected int maxLength;
+    protected GridPoint2 selectedPosition;
     private boolean bCorrectString;
     private boolean fixedFont;
-    private boolean multiLine;
+    protected boolean multiLine;
 
     public Textfield(float x, float y, float width, float height, BitmapFont myFont) {
         super((int) x, (int) y, (int) width, (int) height, "", "");
@@ -65,9 +65,13 @@ public class Textfield extends ApoButton {
     public void setSelect(boolean bSelect) {
         super.setSelect(bSelect);
         if (bSelect) {
-            Gdx.input.setOnscreenKeyboardVisible(true);
-            MainPanel.setActiveInput(getY(), getHeight());
+            onBecameSelected();
         }
+    }
+
+    protected void onBecameSelected() {
+        Gdx.input.setOnscreenKeyboardVisible(true);
+        MainPanel.setActiveInput(getY(), getHeight());
     }
 
     public boolean isCorrectString() {
@@ -322,14 +326,14 @@ public class Textfield extends ApoButton {
         this.showLine();
     }
 
-    private int heldKeyCode = -1;
-    private int heldKeyTimer = 0;
-    private boolean heldKeyRepeating = false;
-    private static final int REPEAT_DELAY = 400;
-    private static final int REPEAT_RATE = 50;
+    protected int heldKeyCode = -1;
+    protected int heldKeyTimer = 0;
+    protected boolean heldKeyRepeating = false;
+    protected static final int REPEAT_DELAY = 400;
+    protected static final int REPEAT_RATE = 50;
 
-    public void keyDown(int keyCode) {
-        if (!this.bEnabled || !this.isSelect()) return;
+    public boolean keyDown(int keyCode) {
+        if (!this.bEnabled || !this.isSelect()) return false;
         if (isNavigationKey(keyCode) && heldKeyCode != keyCode) {
             heldKeyCode = keyCode;
             heldKeyTimer = 0;
@@ -337,21 +341,24 @@ public class Textfield extends ApoButton {
             handleNavigationKey(keyCode);
             Gdx.graphics.setContinuousRendering(true);
             Gdx.graphics.requestRendering();
+            return true;
         }
+        return false;
     }
 
-    public void keyUp(int keyCode) {
+    public boolean keyUp(int keyCode) {
         if (keyCode == heldKeyCode) {
             heldKeyCode = -1;
             Gdx.graphics.setContinuousRendering(false);
         }
-        if (!this.bEnabled || !this.isSelect()) return;
+        if (!this.bEnabled || !this.isSelect()) return false;
         if (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT)) {
-            handleCtrlKey(keyCode);
+            return handleCtrlKey(keyCode);
         }
+        return false;
     }
 
-    private boolean isNavigationKey(int keyCode) {
+    protected boolean isNavigationKey(int keyCode) {
         return keyCode == Input.Keys.LEFT || keyCode == Input.Keys.RIGHT
                 || keyCode == Input.Keys.UP || keyCode == Input.Keys.DOWN
                 || keyCode == Input.Keys.HOME || keyCode == Input.Keys.END;
@@ -388,7 +395,7 @@ public class Textfield extends ApoButton {
         }
     }
 
-    private boolean handleCtrlKey(int keyCode) {
+    protected boolean handleCtrlKey(int keyCode) {
         switch (keyCode) {
             case Input.Keys.A:
                 this.selectedPosition.x = 0;
@@ -429,12 +436,12 @@ public class Textfield extends ApoButton {
         }
     }
 
-    private void clearSelection() {
+    protected void clearSelection() {
         this.selectedPosition.x = -1;
         this.selectedPosition.y = -1;
     }
 
-    private void navigateHome() {
+    protected void navigateHome() {
         if (!multiLine) {
             setPosition(0);
             return;
@@ -445,7 +452,7 @@ public class Textfield extends ApoButton {
         setPosition(lineStarts[line]);
     }
 
-    private void navigateEnd() {
+    protected void navigateEnd() {
         if (!multiLine) {
             setPosition(curString.length());
             return;
@@ -456,7 +463,7 @@ public class Textfield extends ApoButton {
         setPosition(lineStarts[line] + lineTexts.get(line).length());
     }
 
-    private void navigateUp() {
+    protected void navigateUp() {
         if (!multiLine) {
             setPosition(0);
             return;
@@ -474,7 +481,7 @@ public class Textfield extends ApoButton {
         setPosition(lineStarts[line - 1] + targetCol);
     }
 
-    private void navigateDown() {
+    protected void navigateDown() {
         if (!multiLine) {
             setPosition(curString.length());
             return;
@@ -501,14 +508,14 @@ public class Textfield extends ApoButton {
         return 0;
     }
 
-    private float getPixelXForCol(String lineText, int col) {
+    protected float getPixelXForCol(String lineText, int col) {
         col = Math.min(col, lineText.length());
         if (col <= 0) return 0;
         glyphLayout.setText(myFont, lineText.substring(0, col));
         return glyphLayout.width;
     }
 
-    private int getColForPixelX(String lineText, float targetX) {
+    protected int getColForPixelX(String lineText, float targetX) {
         if (lineText.isEmpty()) return 0;
         for (int i = 1; i <= lineText.length(); i++) {
             glyphLayout.setText(myFont, lineText.substring(0, i));

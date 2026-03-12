@@ -2,6 +2,8 @@ package com.apogames.aistories.game.listenStories;
 
 import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
+import com.apogames.backend.GameScreen;
+import com.apogames.entity.Textfield;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -13,51 +15,47 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class BookTextEditor {
+public class BookTextEditor extends Textfield {
 
-    private static final int TIME_LINE = 700;
-    private static final int REPEAT_DELAY = 400;
-    private static final int REPEAT_RATE = 50;
-    private static final int MAX_LENGTH = 50000;
-
-    private String rawText = "";
-    private int cursorPos = 0;
-    private final GridPoint2 selection = new GridPoint2(-1, -1);
-
-    private boolean active = false;
-    private boolean cursorVisible = true;
-    private int blinkTimer = 0;
-
-    private int heldKeyCode = -1;
-    private int heldKeyTimer = 0;
-    private boolean heldKeyRepeating = false;
+    private static final int BOOK_MAX_LENGTH = 50000;
 
     private int[] lineStarts = new int[]{0};
     private List<String> displayLines = new ArrayList<>();
     private Set<Integer> paddingLines = new HashSet<>();
-
     private boolean textChanged = false;
-    private BitmapFont cachedFont;
 
-    public boolean isActive() { return active; }
-    public void setActive(boolean active) {
-        this.active = active;
-        if (active) {
-            Gdx.input.setOnscreenKeyboardVisible(true);
-            MainPanel.setActiveInput(BookRenderer.BOOK_Y, BookRenderer.getBookHeight());
-        }
+    // Render context (set by caller before render)
+    private FontSize renderFontSize;
+    private int renderCurrentSpread;
+    private int renderRowsPerPage;
+    private BitmapFont renderHeadingFont;
+    private Set<Integer> renderChapterLines;
+
+    public BookTextEditor() {
+        super(0, 0, 0, 0, null);
+        this.curString = "";
+        this.position = 0;
+        this.selectedPosition = new GridPoint2(-1, -1);
+        this.maxLength = BOOK_MAX_LENGTH;
+        this.multiLine = true;
+        this.bLineOn = true;
+        this.time = 0;
+        setFixedFont(true);
     }
-    public String getRawText() { return rawText; }
-    public int getCursorPos() { return cursorPos; }
+
+    // --- API ---
+
+    public boolean isActive() { return isSelect(); }
+    public void setActive(boolean active) { setSelect(active); }
+    public String getRawText() { return getCurString(); }
     public boolean isTextChanged() { return textChanged; }
-    public void clearTextChanged() { this.textChanged = false; }
-    public void setFont(BitmapFont font) { this.cachedFont = font; }
+    public void clearTextChanged() { textChanged = false; }
     public List<String> getDisplayLines() { return displayLines; }
 
     public void setText(String text) {
-        this.rawText = text != null ? text : "";
-        this.cursorPos = 0;
-        this.selection.set(-1, -1);
+        this.curString = text != null ? text : "";
+        this.position = 0;
+        clearSelection();
         this.textChanged = false;
     }
 
@@ -67,15 +65,122 @@ public class BookTextEditor {
         this.paddingLines = new HashSet<>(padding);
     }
 
-    // --- Cursor line/position ---
+    public boolean hasSelection() {
+        return selectedPosition.x >= 0 && selectedPosition.y >= 0
+                && selectedPosition.x != selectedPosition.y;
+    }
 
-    public int getDisplayLineForCursor() {
-        if (lineStarts == null || lineStarts.length == 0) return 0;
-        for (int i = lineStarts.length - 1; i >= 0; i--) {
-            if (paddingLines.contains(i)) continue;
-            if (cursorPos >= lineStarts[i]) return i;
+    // --- Select override for book coordinates ---
+
+    @Override
+    protected void onBecameSelected() {
+        // Don't open keyboard on setSelect - only on explicit click in handleClick
+    }
+
+    // --- Text editing with textChanged tracking ---
+
+    @Override
+    public void addTypedCharacter(char character) {
+        String before = this.curString;
+        super.addTypedCharacter(character);
+        if (!this.curString.equals(before)) {
+            textChanged = true;
         }
-        return 0;
+    }
+
+    @Override
+    protected boolean handleCtrlKey(int keyCode) {
+        String before = this.curString;
+        boolean result = super.handleCtrlKey(keyCode);
+        if (!this.curString.equals(before)) {
+            textChanged = true;
+        }
+        return result;
+    }
+
+    // --- Navigation with shift-selection and book display lines ---
+
+    @Override
+    public boolean handleNavigationKey(int keyCode) {
+        boolean shift = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)
+                || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
+        int oldPos = position;
+        if (shift && selectedPosition.x < 0) {
+            selectedPosition.set(position, position);
+        }
+
+        switch (keyCode) {
+            case Input.Keys.LEFT:  setPosition(position - 1); break;
+            case Input.Keys.RIGHT: setPosition(position + 1); break;
+            case Input.Keys.HOME:  navigateHome(); break;
+            case Input.Keys.END:   navigateEnd(); break;
+            case Input.Keys.UP:    navigateUp(); break;
+            case Input.Keys.DOWN:  navigateDown(); break;
+            default: return false;
+        }
+
+        if (shift) {
+            updateSelectionTo(position, oldPos);
+        } else {
+            clearSelection();
+        }
+        return true;
+    }
+
+    private void updateSelectionTo(int newPos, int oldPos) {
+        if (selectedPosition.x < 0) {
+            selectedPosition.set(Math.min(oldPos, newPos), Math.max(oldPos, newPos));
+        } else {
+            if (oldPos == selectedPosition.y) {
+                selectedPosition.y = newPos;
+            } else {
+                selectedPosition.x = newPos;
+            }
+            if (selectedPosition.x > selectedPosition.y) {
+                int tmp = selectedPosition.x;
+                selectedPosition.x = selectedPosition.y;
+                selectedPosition.y = tmp;
+            }
+            if (selectedPosition.x == selectedPosition.y) clearSelection();
+        }
+    }
+
+    @Override
+    protected void navigateHome() {
+        if (lineStarts == null) { setPosition(0); return; }
+        int line = getDisplayLineForCursor();
+        setPosition(lineStarts[line]);
+    }
+
+    @Override
+    protected void navigateEnd() {
+        if (lineStarts == null) { setPosition(curString.length()); return; }
+        int line = getDisplayLineForCursor();
+        setPosition(lineStarts[line] + displayLines.get(line).length());
+    }
+
+    @Override
+    protected void navigateUp() {
+        if (lineStarts == null) { setPosition(0); return; }
+        int line = getDisplayLineForCursor();
+        int target = findNonPaddingLine(line - 1, -1);
+        if (target < 0) { setPosition(0); return; }
+        int col = position - lineStarts[line];
+        float pixelX = getPixelXForCol(displayLines.get(line), col);
+        int targetCol = getColForPixelX(displayLines.get(target), pixelX);
+        setPosition(lineStarts[target] + targetCol);
+    }
+
+    @Override
+    protected void navigateDown() {
+        if (lineStarts == null) { setPosition(curString.length()); return; }
+        int line = getDisplayLineForCursor();
+        int target = findNonPaddingLine(line + 1, +1);
+        if (target < 0) { setPosition(curString.length()); return; }
+        int col = position - lineStarts[line];
+        float pixelX = getPixelXForCol(displayLines.get(line), col);
+        int targetCol = getColForPixelX(displayLines.get(target), pixelX);
+        setPosition(lineStarts[target] + targetCol);
     }
 
     private int findNonPaddingLine(int from, int direction) {
@@ -83,14 +188,24 @@ public class BookTextEditor {
         while (line >= 0 && line < displayLines.size() && paddingLines.contains(line)) {
             line += direction;
         }
-        if (line < 0 || line >= displayLines.size()) return -1;
-        return line;
+        return (line < 0 || line >= displayLines.size()) ? -1 : line;
+    }
+
+    // --- Display line helpers ---
+
+    public int getDisplayLineForCursor() {
+        if (lineStarts == null || lineStarts.length == 0) return 0;
+        for (int i = lineStarts.length - 1; i >= 0; i--) {
+            if (paddingLines.contains(i)) continue;
+            if (position >= lineStarts[i]) return i;
+        }
+        return 0;
     }
 
     public float getCursorXOffset(BitmapFont font, BitmapFont headingFont, Set<Integer> chapterLines) {
         int line = getDisplayLineForCursor();
         if (line >= displayLines.size()) return 0;
-        int col = cursorPos - lineStarts[line];
+        int col = position - lineStarts[line];
         String lineText = displayLines.get(line);
         col = Math.min(col, lineText.length());
         if (col <= 0) return 0;
@@ -101,271 +216,17 @@ public class BookTextEditor {
 
     public int getSpreadForCursor(int rowsPerPage) {
         if (rowsPerPage <= 0) return 0;
-        int line = getDisplayLineForCursor();
-        return line / (2 * rowsPerPage);
+        return getDisplayLineForCursor() / (2 * rowsPerPage);
     }
 
-    // --- Text editing ---
-
-    public void addTypedCharacter(char character) {
-        if (!active) return;
-        if (character == 8) {
-            deleteSelectedOrBackspace();
-        } else if (character == 127) {
-            deleteSelectedOrForward();
-        } else if (character == 10 || character == 13) {
-            deleteSelectedText();
-            if (rawText.length() < MAX_LENGTH) {
-                rawText = rawText.substring(0, cursorPos) + '\n' + rawText.substring(cursorPos);
-                cursorPos++;
-                textChanged = true;
-            }
-        } else if (character >= 32) {
-            deleteSelectedText();
-            if (rawText.length() < MAX_LENGTH) {
-                rawText = rawText.substring(0, cursorPos) + character + rawText.substring(cursorPos);
-                cursorPos++;
-                textChanged = true;
-            }
-        }
-        showCursor();
-    }
-
-    private void deleteSelectedOrBackspace() {
-        if (hasSelection()) {
-            deleteSelectedText();
-        } else if (cursorPos > 0) {
-            rawText = rawText.substring(0, cursorPos - 1) + rawText.substring(cursorPos);
-            cursorPos--;
-            textChanged = true;
-        }
-        clearSelection();
-    }
-
-    private void deleteSelectedOrForward() {
-        if (hasSelection()) {
-            deleteSelectedText();
-        } else if (cursorPos < rawText.length()) {
-            rawText = rawText.substring(0, cursorPos) + rawText.substring(cursorPos + 1);
-            textChanged = true;
-        }
-        clearSelection();
-    }
-
-    private void deleteSelectedText() {
-        if (!hasSelection()) return;
-        rawText = rawText.substring(0, selection.x) + rawText.substring(selection.y);
-        cursorPos = selection.x;
-        clearSelection();
-        textChanged = true;
-    }
-
-    // --- Selection ---
-
-    public boolean hasSelection() {
-        return selection.x >= 0 && selection.y >= 0 && selection.x != selection.y;
-    }
-
-    public String getSelectedText() {
-        if (!hasSelection()) return null;
-        return rawText.substring(selection.x, selection.y);
-    }
-
-    public GridPoint2 getSelection() { return selection; }
-    public void clearSelection() { selection.set(-1, -1); }
-
-    public void selectAll() {
-        selection.set(0, rawText.length());
-        cursorPos = rawText.length();
-    }
-
-    // --- Navigation keys (keyDown) ---
-
-    public boolean keyDown(int keyCode) {
-        if (!active) return false;
-        if (isNavigationKey(keyCode) && heldKeyCode != keyCode) {
-            heldKeyCode = keyCode;
-            heldKeyTimer = 0;
-            heldKeyRepeating = false;
-            handleNavigationKey(keyCode);
-            Gdx.graphics.setContinuousRendering(true);
-            Gdx.graphics.requestRendering();
-            return true;
-        }
-        return false;
-    }
-
-    // --- Ctrl combos (keyUp) ---
-
-    public boolean keyUp(int keyCode) {
-        if (keyCode == heldKeyCode) {
-            heldKeyCode = -1;
-            Gdx.graphics.setContinuousRendering(false);
-        }
-        if (!active) return false;
-        if (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT)) {
-            return handleCtrlKey(keyCode);
-        }
-        return false;
-    }
-
-    private boolean isNavigationKey(int keyCode) {
-        return keyCode == Input.Keys.LEFT || keyCode == Input.Keys.RIGHT
-                || keyCode == Input.Keys.UP || keyCode == Input.Keys.DOWN
-                || keyCode == Input.Keys.HOME || keyCode == Input.Keys.END;
-    }
-
-    private boolean handleNavigationKey(int keyCode) {
-        boolean shift = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT) || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
-        int oldPos = cursorPos;
-        if (shift && selection.x < 0) selection.set(cursorPos, cursorPos);
-
-        switch (keyCode) {
-            case Input.Keys.LEFT:  setCursorPos(cursorPos - 1); break;
-            case Input.Keys.RIGHT: setCursorPos(cursorPos + 1); break;
-            case Input.Keys.HOME:  navigateHome(); break;
-            case Input.Keys.END:   navigateEnd(); break;
-            case Input.Keys.UP:    navigateUp(); break;
-            case Input.Keys.DOWN:  navigateDown(); break;
-            default: return false;
-        }
-
-        if (shift) {
-            updateSelectionTo(cursorPos, oldPos);
-        } else {
-            clearSelection();
-        }
-        showCursor();
-        return true;
-    }
-
-    private void updateSelectionTo(int newPos, int oldPos) {
-        if (selection.x < 0) {
-            selection.set(Math.min(oldPos, newPos), Math.max(oldPos, newPos));
-        } else {
-            if (oldPos == selection.y) {
-                selection.y = newPos;
-            } else {
-                selection.x = newPos;
-            }
-            if (selection.x > selection.y) {
-                int tmp = selection.x;
-                selection.x = selection.y;
-                selection.y = tmp;
-            }
-            if (selection.x == selection.y) clearSelection();
-        }
-    }
-
-    private boolean handleCtrlKey(int keyCode) {
-        switch (keyCode) {
-            case Input.Keys.A:
-                selectAll();
-                return true;
-            case Input.Keys.C:
-                String selC = getSelectedText();
-                if (selC != null && !selC.isEmpty()) Gdx.app.getClipboard().setContents(selC);
-                return true;
-            case Input.Keys.X:
-                String selX = getSelectedText();
-                if (selX != null && !selX.isEmpty()) {
-                    Gdx.app.getClipboard().setContents(selX);
-                    deleteSelectedText();
-                }
-                return true;
-            case Input.Keys.V:
-                String clip = Gdx.app.getClipboard().getContents();
-                if (clip != null && !clip.isEmpty()) {
-                    deleteSelectedText();
-                    if (rawText.length() + clip.length() <= MAX_LENGTH) {
-                        rawText = rawText.substring(0, cursorPos) + clip + rawText.substring(cursorPos);
-                        cursorPos += clip.length();
-                        clearSelection();
-                        textChanged = true;
-                    }
-                }
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private void setCursorPos(int pos) {
-        cursorPos = Math.max(0, Math.min(pos, rawText.length()));
-    }
-
-    private BitmapFont getDefaultFont() {
-        return cachedFont != null ? cachedFont : FontSize.FONT_25.getFont();
-    }
-
-    private void navigateHome() {
-        if (lineStarts == null) { setCursorPos(0); return; }
-        int line = getDisplayLineForCursor();
-        setCursorPos(lineStarts[line]);
-    }
-
-    private void navigateEnd() {
-        if (lineStarts == null) { setCursorPos(rawText.length()); return; }
-        int line = getDisplayLineForCursor();
-        setCursorPos(lineStarts[line] + displayLines.get(line).length());
-    }
-
-    private void navigateUp() {
-        if (lineStarts == null) { setCursorPos(0); return; }
-        int line = getDisplayLineForCursor();
-        int target = findNonPaddingLine(line - 1, -1);
-        if (target < 0) { setCursorPos(0); return; }
-        int col = cursorPos - lineStarts[line];
-        float pixelX = getPixelXForCol(displayLines.get(line), col);
-        int targetCol = getColForPixelX(displayLines.get(target), pixelX);
-        setCursorPos(lineStarts[target] + targetCol);
-    }
-
-    private void navigateDown() {
-        if (lineStarts == null) { setCursorPos(rawText.length()); return; }
-        int line = getDisplayLineForCursor();
-        int target = findNonPaddingLine(line + 1, +1);
-        if (target < 0) { setCursorPos(rawText.length()); return; }
-        int col = cursorPos - lineStarts[line];
-        float pixelX = getPixelXForCol(displayLines.get(line), col);
-        int targetCol = getColForPixelX(displayLines.get(target), pixelX);
-        setCursorPos(lineStarts[target] + targetCol);
-    }
-
-    private float getPixelXForCol(String lineText, int col) {
-        col = Math.min(col, lineText.length());
-        if (col <= 0) return 0;
-        Constants.glyphLayout.setText(getDefaultFont(), lineText.substring(0, col));
-        return Constants.glyphLayout.width;
-    }
-
-    private int getColForPixelX(String lineText, float targetX) {
-        if (lineText.isEmpty()) return 0;
-        BitmapFont font = getDefaultFont();
-        for (int i = 1; i <= lineText.length(); i++) {
-            Constants.glyphLayout.setText(font, lineText.substring(0, i));
-            if (Constants.glyphLayout.width >= targetX) {
-                float right = Constants.glyphLayout.width;
-                float left = 0;
-                if (i > 1) {
-                    Constants.glyphLayout.setText(font, lineText.substring(0, i - 1));
-                    left = Constants.glyphLayout.width;
-                }
-                return (targetX - left < right - targetX) ? i - 1 : i;
-            }
-        }
-        return lineText.length();
-    }
-
-    // --- Mouse ---
+    // --- Mouse handling for book pages ---
 
     public boolean handleClick(int mouseX, int mouseY, FontSize fontSize, int currentSpread,
                                 int rowsPerPage, BitmapFont headingFont, Set<Integer> chapterLines) {
-        if (!active) return false;
+        if (!isSelect()) return false;
         int globalLine = mouseToGlobalLine(mouseX, mouseY, fontSize, currentSpread, rowsPerPage);
         if (globalLine < 0) return false;
 
-        // Snap away from padding lines
         if (paddingLines.contains(globalLine)) {
             int nearest = findNonPaddingLine(globalLine, +1);
             if (nearest < 0) nearest = findNonPaddingLine(globalLine, -1);
@@ -379,9 +240,8 @@ public class BookTextEditor {
         BitmapFont font = isHeading ? headingFont : fontSize.getFont();
 
         int col = getColForPixelXWithFont(lineText, relX, font);
-        setCursorPos(lineStarts[globalLine] + col);
+        setPosition(lineStarts[globalLine] + col);
         clearSelection();
-        showCursor();
         Gdx.input.setOnscreenKeyboardVisible(true);
         MainPanel.setActiveInput(BookRenderer.BOOK_Y, BookRenderer.getBookHeight());
         Gdx.graphics.requestRendering();
@@ -390,7 +250,7 @@ public class BookTextEditor {
 
     public boolean handleDrag(int mouseX, int mouseY, FontSize fontSize, int currentSpread,
                                int rowsPerPage, BitmapFont headingFont, Set<Integer> chapterLines) {
-        if (!active) return false;
+        if (!isSelect()) return false;
         int globalLine = mouseToGlobalLine(mouseX, mouseY, fontSize, currentSpread, rowsPerPage);
         if (globalLine < 0) return false;
 
@@ -407,13 +267,12 @@ public class BookTextEditor {
         BitmapFont font = isHeading ? headingFont : fontSize.getFont();
 
         int col = getColForPixelXWithFont(lineText, relX, font);
-        int oldPos = cursorPos;
+        int oldPos = position;
         int newPos = lineStarts[globalLine] + col;
-        setCursorPos(newPos);
+        setPosition(newPos);
 
-        if (selection.x < 0) selection.set(oldPos, oldPos);
+        if (selectedPosition.x < 0) selectedPosition.set(oldPos, oldPos);
         updateSelectionTo(newPos, oldPos);
-        showCursor();
         Gdx.graphics.requestRendering();
         return true;
     }
@@ -467,52 +326,56 @@ public class BookTextEditor {
         return lineText.length();
     }
 
-    // --- Cursor blink ---
+    // --- Think override ---
 
+    @Override
     public void think(int delta) {
-        if (!active) return;
-        blinkTimer += delta;
-        if (blinkTimer >= TIME_LINE) {
-            blinkTimer = 0;
-            cursorVisible = !cursorVisible;
+        if (!isSelect()) return;
+        boolean wasBlink = bLineOn;
+        super.think(delta);
+        if (bLineOn != wasBlink) {
             Gdx.graphics.requestRendering();
         }
-        if (heldKeyCode >= 0) {
-            heldKeyTimer += delta;
-            if (!heldKeyRepeating && heldKeyTimer >= REPEAT_DELAY) {
-                heldKeyRepeating = true;
-                heldKeyTimer = 0;
-            }
-            if (heldKeyRepeating && heldKeyTimer >= REPEAT_RATE) {
-                heldKeyTimer -= REPEAT_RATE;
-                handleNavigationKey(heldKeyCode);
-            }
+    }
+
+    // --- Render context ---
+
+    public void setRenderContext(FontSize fontSize, int currentSpread, int rowsPerPage,
+                                  BitmapFont headingFont, Set<Integer> chapterLines) {
+        this.renderFontSize = fontSize;
+        this.renderCurrentSpread = currentSpread;
+        this.renderRowsPerPage = rowsPerPage;
+        this.renderHeadingFont = headingFont;
+        this.renderChapterLines = chapterLines;
+    }
+
+    @Override
+    public void render(GameScreen screen, int changeX, int changeY) {
+        if (!isSelect() || renderFontSize == null) return;
+        if (lineStarts == null || displayLines.isEmpty()) return;
+
+        ShapeRenderer renderer = screen.getRenderer();
+
+        if (hasSelection()) {
+            renderSelection(renderer);
+        }
+        if (bLineOn) {
+            renderCursor(renderer);
         }
     }
 
-    private void showCursor() {
-        cursorVisible = true;
-        blinkTimer = 0;
-    }
-
-    // --- Rendering ---
-
-    public void renderCursor(ShapeRenderer renderer, FontSize fontSize, int currentSpread,
-                              int rowsPerPage, BitmapFont headingFont, Set<Integer> chapterLines) {
-        if (!active || !cursorVisible) return;
-        if (lineStarts == null || displayLines.isEmpty()) return;
-
+    private void renderCursor(ShapeRenderer renderer) {
         int line = getDisplayLineForCursor();
-        int leftStart = currentSpread * 2 * rowsPerPage;
-        int rightStart = leftStart + rowsPerPage;
+        int leftStart = renderCurrentSpread * 2 * renderRowsPerPage;
+        int rightStart = leftStart + renderRowsPerPage;
 
         boolean isLeftPage;
         int localRow;
 
-        if (line >= leftStart && line < leftStart + rowsPerPage) {
+        if (line >= leftStart && line < leftStart + renderRowsPerPage) {
             isLeftPage = true;
             localRow = line - leftStart;
-        } else if (line >= rightStart && line < rightStart + rowsPerPage) {
+        } else if (line >= rightStart && line < rightStart + renderRowsPerPage) {
             isLeftPage = false;
             localRow = line - rightStart;
         } else {
@@ -522,26 +385,22 @@ public class BookTextEditor {
         int pageX = isLeftPage ? BookRenderer.LEFT_PAGE_X : BookRenderer.RIGHT_PAGE_X;
         int pageY = isLeftPage ? BookRenderer.LEFT_PAGE_Y : BookRenderer.RIGHT_PAGE_Y;
 
-        float xOffset = getCursorXOffset(fontSize.getFont(), headingFont, chapterLines);
+        float xOffset = getCursorXOffset(renderFontSize.getFont(), renderHeadingFont, renderChapterLines);
         float x = pageX + BookRenderer.TEXT_PADDING + xOffset;
-        float y = pageY + BookRenderer.TEXT_PADDING + localRow * fontSize.getAdd();
+        float y = pageY + BookRenderer.TEXT_PADDING + localRow * renderFontSize.getAdd();
 
         Gdx.gl20.glLineWidth(3f);
         renderer.begin(ShapeRenderer.ShapeType.Line);
         renderer.setColor(Constants.COLOR_BROWN[0], Constants.COLOR_BROWN[1], Constants.COLOR_BROWN[2], 1f);
-        renderer.line(x, y, x, y + fontSize.getFont().getCapHeight());
+        renderer.line(x, y, x, y + renderFontSize.getFont().getCapHeight());
         renderer.end();
         Gdx.gl20.glLineWidth(1f);
     }
 
-    public void renderSelection(ShapeRenderer renderer, FontSize fontSize, int currentSpread,
-                                 int rowsPerPage, BitmapFont headingFont, Set<Integer> chapterLines) {
-        if (!active || !hasSelection()) return;
-        if (lineStarts == null || displayLines.isEmpty()) return;
-
-        int leftStart = currentSpread * 2 * rowsPerPage;
-        int rightStart = leftStart + rowsPerPage;
-        int visibleEnd = rightStart + rowsPerPage;
+    private void renderSelection(ShapeRenderer renderer) {
+        int leftStart = renderCurrentSpread * 2 * renderRowsPerPage;
+        int rightStart = leftStart + renderRowsPerPage;
+        int visibleEnd = rightStart + renderRowsPerPage;
 
         renderer.begin(ShapeRenderer.ShapeType.Filled);
         renderer.setColor(0f, 150f / 255f, 255f / 255f, 0.3f);
@@ -552,7 +411,7 @@ public class BookTextEditor {
 
             int lineStart = lineStarts[i];
             int lineEnd = lineStart + displayLines.get(i).length();
-            if (selection.y <= lineStart || selection.x >= lineEnd) continue;
+            if (selectedPosition.y <= lineStart || selectedPosition.x >= lineEnd) continue;
 
             boolean isLeftPage = (i >= leftStart && i < rightStart);
             int localRow = isLeftPage ? (i - leftStart) : (i - rightStart);
@@ -560,11 +419,11 @@ public class BookTextEditor {
             int pageX = isLeftPage ? BookRenderer.LEFT_PAGE_X : BookRenderer.RIGHT_PAGE_X;
             int pageY = isLeftPage ? BookRenderer.LEFT_PAGE_Y : BookRenderer.RIGHT_PAGE_Y;
 
-            int hlStart = Math.max(selection.x, lineStart) - lineStart;
-            int hlEnd = Math.min(selection.y, lineEnd) - lineStart;
+            int hlStart = Math.max(selectedPosition.x, lineStart) - lineStart;
+            int hlEnd = Math.min(selectedPosition.y, lineEnd) - lineStart;
 
-            boolean isHeading = chapterLines != null && chapterLines.contains(i);
-            BitmapFont font = isHeading ? headingFont : fontSize.getFont();
+            boolean isHeading = renderChapterLines != null && renderChapterLines.contains(i);
+            BitmapFont font = isHeading ? renderHeadingFont : renderFontSize.getFont();
 
             String lineText = displayLines.get(i);
             String before = lineText.substring(0, hlStart);
@@ -578,8 +437,8 @@ public class BookTextEditor {
             float selWidth = Constants.glyphLayout.width;
 
             renderer.rect(pageX + BookRenderer.TEXT_PADDING + xStart,
-                    pageY + BookRenderer.TEXT_PADDING + localRow * fontSize.getAdd(),
-                    selWidth, fontSize.getAdd());
+                    pageY + BookRenderer.TEXT_PADDING + localRow * renderFontSize.getAdd(),
+                    selWidth, renderFontSize.getAdd());
         }
 
         renderer.end();

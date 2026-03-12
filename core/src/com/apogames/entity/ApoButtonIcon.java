@@ -7,7 +7,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 
 public class ApoButtonIcon extends ApoButton {
 
-    public enum IconType { EDIT, SEARCH }
+    public enum IconType { EDIT, SEARCH, PLUS }
 
     private final float[] circleColor;
     private final float[] iconColor;
@@ -53,6 +53,8 @@ public class ApoButtonIcon extends ApoButton {
         // Icon
         if (iconType == IconType.SEARCH) {
             drawSearchFilled(screen, cx, cy);
+        } else if (iconType == IconType.PLUS) {
+            drawPlusFilled(screen, cx, cy);
         } else {
             drawPencilFilled(screen, cx, cy);
         }
@@ -108,6 +110,17 @@ public class ApoButtonIcon extends ApoButton {
                 cx + 8 * s + 3 * s, cy - 8 * s + 3 * s,
                 1.5f * s
         );
+    }
+
+    private void drawPlusFilled(GameScreen screen, float cx, float cy) {
+        screen.getRenderer().setColor(iconColor[0], iconColor[1], iconColor[2], 1f);
+        float s = getWidth() / 48f;
+        float halfLen = 10 * s;
+        float thickness = 4 * s;
+        // Horizontal bar
+        screen.getRenderer().rectLine(cx - halfLen, cy, cx + halfLen, cy, thickness);
+        // Vertical bar
+        screen.getRenderer().rectLine(cx, cy - halfLen, cx, cy + halfLen, thickness);
     }
 
     private void drawSearchFilled(GameScreen screen, float cx, float cy) {
