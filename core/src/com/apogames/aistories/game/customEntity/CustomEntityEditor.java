@@ -73,6 +73,7 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     private boolean browseMode;
     private java.util.List<EnumInterface> browseOptions;
     private int browseIndex;
+    private int gridHoverIndex = -1;
     private String browseCategory;
 
     private Textfield nameField;
@@ -120,6 +121,7 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         this.totalImages = this.browseOptions.size();
         this.editTarget = currentSelection;
         this.browseIndex = 0;
+        this.gridHoverIndex = -1;
         for (int i = 0; i < options.size(); i++) {
             if (options.get(i) == currentSelection || options.get(i).getName().equals(currentSelection.getName())) {
                 this.browseIndex = i;
@@ -451,6 +453,10 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         this.detailsField.getMove(mouseX, mouseY);
         if (currentMode == Mode.GENERATE) {
             this.imagePromptField.getMove(mouseX, mouseY);
+        }
+        if (currentMode == Mode.GRID) {
+            int idx = getGridIndexAt(mouseX, mouseY);
+            this.gridHoverIndex = (idx >= 0 && idx < totalImages) ? idx : -1;
         }
     }
 
@@ -828,12 +834,18 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
         this.totalImages = this.browseOptions.size();
         this.browseMode = true;
         this.browseIndex = 0;
-        for (int i = 0; i < browseOptions.size(); i++) {
-            if (browseOptions.get(i) == savedProfile || browseOptions.get(i).getName().equals(savedProfile.getName())) {
-                this.browseIndex = i;
-                break;
+        if (savedProfile != null) {
+            for (int i = 0; i < browseOptions.size(); i++) {
+                if (browseOptions.get(i) == savedProfile || browseOptions.get(i).getName().equals(savedProfile.getName())) {
+                    this.browseIndex = i;
+                    break;
+                }
             }
         }
+        this.nameField.setSelect(false);
+        this.detailsField.setSelect(false);
+        this.imagePromptField.setSelect(false);
+        this.activeField = null;
         updateBrowseDisplay();
         this.scrollOffset = 0;
         this.currentMode = Mode.GRID;
@@ -888,6 +900,11 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
 
     @Override
     protected void quit() {
+        if (!browseMode && browseCategory != null) {
+            // Edit mode: X goes back to browse mode
+            returnToBrowseWithSelection(editTarget != null ? editTarget : browseOptions != null && !browseOptions.isEmpty() ? browseOptions.get(0) : null);
+            return;
+        }
         goBack();
     }
 
@@ -940,18 +957,31 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
 
         // Selection highlight (grid mode) — ShapeRenderer before SpriteBatch
         if (currentMode == Mode.GRID) {
-            boolean isBrowse = browseMode;
-            int selIdx = isBrowse ? browseIndex : selectedImageIndex;
+            int selIdx = browseMode ? browseIndex : selectedImageIndex;
             getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
-            int selCol = selIdx % GRID_COLS;
-            int selRow = selIdx / GRID_COLS;
-            float selY = GRID_START_Y + selRow * (GRID_SPRITE_SIZE + GRID_PADDING) - scrollOffset;
-            if (selY >= GRID_START_Y - GRID_SPRITE_SIZE && selY < Constants.GAME_HEIGHT) {
-                getMainPanel().getRenderer().setColor(Constants.COLOR_YELLOW[0], Constants.COLOR_YELLOW[1], Constants.COLOR_YELLOW[2], 1f);
+            // Red border: currently selected item
+            int redCol = selIdx % GRID_COLS;
+            int redRow = selIdx / GRID_COLS;
+            float redY = GRID_START_Y + redRow * (GRID_SPRITE_SIZE + GRID_PADDING) - scrollOffset;
+            if (redY >= GRID_START_Y - GRID_SPRITE_SIZE && redY < Constants.GAME_HEIGHT) {
+                getMainPanel().getRenderer().setColor(Constants.COLOR_RED[0], Constants.COLOR_RED[1], Constants.COLOR_RED[2], 1f);
                 getMainPanel().getRenderer().rect(
-                        GRID_START_X + selCol * (GRID_SPRITE_SIZE + GRID_PADDING) - 3,
-                        selY - 3,
+                        GRID_START_X + redCol * (GRID_SPRITE_SIZE + GRID_PADDING) - 3,
+                        redY - 3,
                         GRID_SPRITE_SIZE + 6, GRID_SPRITE_SIZE + 6);
+            }
+            // Yellow border: mouse hover
+            if (gridHoverIndex >= 0 && gridHoverIndex != selIdx) {
+                int yelCol = gridHoverIndex % GRID_COLS;
+                int yelRow = gridHoverIndex / GRID_COLS;
+                float yelY = GRID_START_Y + yelRow * (GRID_SPRITE_SIZE + GRID_PADDING) - scrollOffset;
+                if (yelY >= GRID_START_Y - GRID_SPRITE_SIZE && yelY < Constants.GAME_HEIGHT) {
+                    getMainPanel().getRenderer().setColor(Constants.COLOR_YELLOW[0], Constants.COLOR_YELLOW[1], Constants.COLOR_YELLOW[2], 1f);
+                    getMainPanel().getRenderer().rect(
+                            GRID_START_X + yelCol * (GRID_SPRITE_SIZE + GRID_PADDING) - 3,
+                            yelY - 3,
+                            GRID_SPRITE_SIZE + 6, GRID_SPRITE_SIZE + 6);
+                }
             }
             getMainPanel().getRenderer().end();
         }
@@ -1042,7 +1072,10 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
 
     private void renderGridMode() {
         // Grid label — SpriteBatch is active
-        getMainPanel().drawString(Localization.getInstance().getCommon().get("custom_editor_image"), GRID_START_X, LABEL_Y, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);
+        String gridLabel = browseMode
+                ? Localization.getInstance().getCommon().get("custom_editor_select_profile")
+                : Localization.getInstance().getCommon().get("custom_editor_image");
+        getMainPanel().drawString(gridLabel, GRID_START_X, LABEL_Y, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);
 
         if (browseMode) {
             renderBrowseGrid();
@@ -1217,18 +1250,23 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
             return Localization.getInstance().getCommon().get("custom_editor_title_browse");
         }
         {
-            String key;
+            String baseKey;
             switch (characterEditMode) {
-                case BUILTIN: key = "custom_editor_title_builtin"; break;
-                case PROFILE: key = "custom_editor_title_profile"; break;
-                case NEW: key = "custom_editor_title_new"; break;
-                default: key = "custom_editor_title"; break;
+                case BUILTIN: baseKey = "custom_editor_title_builtin"; break;
+                case PROFILE: baseKey = "custom_editor_title_profile"; break;
+                case NEW: baseKey = "custom_editor_title_new"; break;
+                default: baseKey = "custom_editor_title"; break;
+            }
+            String category = getProfileCategory();
+            if (!"characters".equals(category)) {
+                String catKey = baseKey + "_" + category;
+                try {
+                    return Localization.getInstance().getCommon().get(catKey);
+                } catch (Exception e) { }
             }
             try {
-                return Localization.getInstance().getCommon().get(key);
-            } catch (Exception e) {
-                // fallback
-            }
+                return Localization.getInstance().getCommon().get(baseKey);
+            } catch (Exception e) { }
         }
         return Localization.getInstance().getCommon().get("custom_editor_title");
     }
