@@ -109,12 +109,15 @@ public class BookRenderer {
         mainPanel.getRenderer().end();
     }
 
+    private static final String CHAPTER_WORDS_PATTERN = "(Kapitel|Chapter|Chapitre|Capitolo|Capítulo|Bölüm)";
+
     public static boolean isChapterHeading(String line) {
         if (line == null || line.trim().isEmpty()) return false;
-        String lower = line.trim().toLowerCase();
-        return lower.startsWith("kapitel") || lower.startsWith("chapter")
-                || lower.startsWith("chapitre") || lower.startsWith("capitolo")
-                || lower.startsWith("capítulo") || lower.startsWith("bölüm");
+        return line.trim().matches("(?i)" + CHAPTER_WORDS_PATTERN + "\\s+.*");
+    }
+
+    public static String stripChapterWord(String heading) {
+        return heading.replaceFirst("(?i)" + CHAPTER_WORDS_PATTERN + "\\s+", "");
     }
 
     public void renderPageText(ArrayList<String> lines, int startLine, int rows, FontSize fontSize, boolean isLeftPage) {

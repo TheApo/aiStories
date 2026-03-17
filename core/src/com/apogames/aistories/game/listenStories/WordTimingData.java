@@ -72,6 +72,11 @@ public class WordTimingData {
         }
     }
 
+    public float getDuration() {
+        if (words.isEmpty()) return 0f;
+        return words.get(words.size() - 1).endTime;
+    }
+
     public int getCurrentWordIndex(float playbackSeconds) {
         List<WordTiming> w = this.words;
         if (w.isEmpty()) return -1;

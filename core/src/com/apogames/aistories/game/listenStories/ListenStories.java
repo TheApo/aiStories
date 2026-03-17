@@ -63,6 +63,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private float totalDuration = 0f;
     private int lastRenderedSecond = -1;
     private WordTimingData timingData = null;
+
+    // Independent position tracking (avoids Android MediaPlayer.getCurrentPosition() drift)
+    private long playbackStartNanos = 0;
+    private float playbackStartOffset = 0f;
     private WordHighlighter highlighter = null;
     private ArrayList<Integer> choosenImageStory = new ArrayList<>();
     private int choosenReadStory = -1;
@@ -364,8 +368,11 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 }
             }
 
+            // Strip "Kapitel" word, keep number
+            String heading = BookRenderer.stripChapterWord(fullHeading.toString());
+
             // Re-wrap heading with heading font
-            ArrayList<String> wrapped = wrapTextForFont(fullHeading.toString(), headingFont, maxWidth);
+            ArrayList<String> wrapped = wrapTextForFont(heading, headingFont, maxWidth);
             int rp = headingRawStart;
             for (String wLine : wrapped) {
                 bookRenderer.getChapterLines().add(finalLines.size());
@@ -507,8 +514,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             }
 
             // Strip "Kapitel" word, keep number
-            String heading = fullText.toString()
-                    .replaceFirst("(?i)(Kapitel|Chapter|Chapitre|Capitolo|Capítulo|Bölüm)\\s+", "");
+            String heading = BookRenderer.stripChapterWord(fullText.toString());
 
             // Remove old heading lines
             for (int j = lastIdx; j >= i; j--) {
@@ -650,6 +656,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         }
     }
 
+    private float getPlaybackPosition() {
+        if (playbackStartNanos == 0 || music == null) return 0f;
+        float pos = playbackStartOffset + (System.nanoTime() - playbackStartNanos) / 1_000_000_000f;
+        return Math.min(pos, totalDuration);
+    }
+
     private String formatTime(float seconds) {
         int totalSeconds = (int) seconds;
         int minutes = totalSeconds / 60;
@@ -668,11 +680,30 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         if (custom != null && custom.getName().equals(name)) {
             return custom;
         }
+        String category = profileCategoryFor(custom);
+        if (category != null) {
+            for (CharacterProfile p : this.getMainPanel().getCustomProfiles(category)) {
+                if (p.getName().equals(name)) {
+                    return p;
+                }
+            }
+            CharacterProfile override = this.getMainPanel().getOverrideFor(category, name);
+            if (override != null) {
+                return override;
+            }
+        }
         EnumInterface lookup = current != null ? current : fallback;
         if (lookup != null) {
             return lookup.getEnumByName(name);
         }
         return null;
+    }
+
+    private String profileCategoryFor(CustomEntity custom) {
+        if (custom == null) return null;
+        String enumName = custom.getEnumName();
+        if ("mainCharacter".equals(enumName) || "supportingCharacter".equals(enumName)) return "characters";
+        return enumName;
     }
 
     public void createNewStory() {
@@ -1215,7 +1246,11 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void loadMusicFromFile(FileHandle fileHandle, String searchName) {
         this.music = Gdx.audio.newMusic(fileHandle);
+        this.playbackStartNanos = 0;
+        this.playbackStartOffset = 0f;
         this.music.setOnCompletionListener(m -> {
+            this.playbackStartNanos = 0;
+            this.playbackStartOffset = 0f;
             this.lastRenderedSecond = -1;
             this.highlighter = null;
             Gdx.graphics.setContinuousRendering(false);
@@ -1230,6 +1265,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         }
         String jsonPath = Prompt.DIRECTORY + searchName + ".json";
         this.timingData = WordTimingData.loadFromFile(jsonPath);
+        if (this.timingData != null && this.timingData.getDuration() > 0) {
+            this.totalDuration = this.timingData.getDuration();
+        }
         Gdx.app.log("ListenStories", "Word timing JSON " + (this.timingData != null ? "loaded (" + this.timingData.getWords().size() + " words)" : "not found") + " for " + searchName);
     }
 
@@ -1259,7 +1297,11 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             }
         }
         this.music = Gdx.audio.newMusic(variantFile);
+        this.playbackStartNanos = 0;
+        this.playbackStartOffset = 0f;
         this.music.setOnCompletionListener(m -> {
+            this.playbackStartNanos = 0;
+            this.playbackStartOffset = 0f;
             this.lastRenderedSecond = -1;
             Gdx.graphics.setContinuousRendering(false);
             updateAudioButtonVisibility();
@@ -1315,6 +1357,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private void playMusic() {
         if (this.music != null) {
             this.music.play();
+            this.playbackStartNanos = System.nanoTime();
+            // playbackStartOffset is 0 after stop/load, or saved position after pause
             Gdx.graphics.setContinuousRendering(true);
             if (this.timingData != null && this.highlighter == null) {
                 this.highlighter = new WordHighlighter(this.timingData);
@@ -1338,6 +1382,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void pauseMusic() {
         if (this.music != null) {
+            this.playbackStartOffset = getPlaybackPosition();
+            this.playbackStartNanos = 0;
             this.music.pause();
         }
         Gdx.graphics.setContinuousRendering(false);
@@ -1349,6 +1395,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.music.stop();
             this.music.setPosition(0);
         }
+        this.playbackStartNanos = 0;
+        this.playbackStartOffset = 0f;
         this.lastRenderedSecond = -1;
         this.highlighter = null;
         Gdx.graphics.setContinuousRendering(false);
@@ -1377,14 +1425,15 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.textEditor.think((int) delta);
 
         if (this.music != null && this.music.isPlaying()) {
-            int currentSecond = (int) this.music.getPosition();
+            float position = getPlaybackPosition();
+            int currentSecond = (int) position;
             if (currentSecond != this.lastRenderedSecond) {
                 this.lastRenderedSecond = currentSecond;
                 Gdx.graphics.requestRendering();
             }
             // Update word highlighter and auto-page-turn
             if (this.highlighter != null && !pageAnimation.isAnimating()) {
-                this.highlighter.update(this.music.getPosition());
+                this.highlighter.update(position);
                 int currentLine = this.highlighter.getCurrentLine();
                 if (currentLine >= 0) {
                     int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
@@ -1662,7 +1711,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             getMainPanel().drawString(label, ROW_BG_X + 15, textY, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);
 
             if (this.music != null && this.totalDuration > 0) {
-                String timeDisplay = formatTime(this.music.getPosition()) + " / " + formatTime(this.totalDuration);
+                String timeDisplay = formatTime(getPlaybackPosition()) + " / " + formatTime(this.totalDuration);
                 getMainPanel().drawString(timeDisplay, ROW_BG_X + ROW_BG_WIDTH - 15, textY, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.END, false, false);
             }
             getMainPanel().spriteBatch.end();
