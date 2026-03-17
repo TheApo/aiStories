@@ -135,8 +135,35 @@ public class SongPrompt {
         return sb.toString();
     }
 
+    private static final int SUNO_STYLE_MAX = 1000;
+
     public static String buildSunoStyle(SongSettings settings) {
-        return getCompactStyle(settings.getMusicStyle()) + " fuer " + settings.getAgeDescription();
+        String style = getStyleDescription(settings.getMusicStyle())
+                + " fuer Hoerer im Alter von " + settings.getAgeDescription() + ". "
+                + getAgeMusicTone(settings.getAgeGroup());
+        if (style.length() > SUNO_STYLE_MAX) {
+            style = style.substring(0, SUNO_STYLE_MAX);
+        }
+        return style;
+    }
+
+    private static String getAgeMusicTone(StorySettings.AgeGroup ageGroup) {
+        switch (ageGroup) {
+            case AGE_0_1:
+                return "Warm, zart und beruhigend. Sanfte und viele Wiederholungen und weiche Klaenge, wie ein Wiegenlied zum Einschlummern.";
+            case AGE_2_4:
+                return "Froelich, verspielt und albern. Zum Mittanzen und Mitsingen einladend, mit einfachem eingaengigem Rhythmus.";
+            case AGE_5_7:
+                return "Froehlich, abenteuerlich und ermutigend. Eingaengiger Mitsing-Refrain mit Ohrwurm-Qualitaet.";
+            case AGE_8_12:
+                return "Energiegeladen, ermutigend und cool. Kraftvoller Refrain zum lauten Mitsingen.";
+            case AGE_12_16:
+                return "Emotional, kraeftig und authentisch. Direkt und echt, mit Intensitaet und Tiefe. Refrain braucht Ohrwurm Qualität.";
+            case AGE_16_PLUS:
+                return "Poetisch, nachdenklich und intensiv. Mit Gaensehaut-Momenten und emotionaler Tiefe, aber echtem Ohrwurm im Refrain.";
+            default:
+                return "Froelich, kindgerecht und mitsingbar.";
+        }
     }
 
     private static String getLyricsStructure(SongSettings.SongLength length) {
@@ -236,7 +263,7 @@ public class SongPrompt {
         switch (style) {
             case POP: return "Eingaengiges Pop-Lied";
             case ROCK: return "Energisches Rock-Lied";
-            case COUNTRY: return "Warmes Country-Lied";
+            case EIGHTIES: return "80er Synthpop-Lied";
             case HIPHOP: return "Rhythmisches HipHop-Lied";
             case LULLABY: return "Sanftes Schlaflied";
             case PIANO: return "Ruhiges emotionales Piano-Lied";
@@ -276,8 +303,8 @@ public class SongPrompt {
                 return "Pop — eingaengige Melodie, klarer Beat, leicht mitzusingen, mit einem Ohrwurm-Refrain";
             case ROCK:
                 return "Rock — energiegeladen, kraftvoller Rhythmus, treibende Gitarren-Atmosphaere, mit Dynamik zwischen ruhigen und lauten Passagen";
-            case COUNTRY:
-                return "Country — warme, erzaehlerische Stimmung, akustische Gitarren-Atmosphaere, bodenstaendig und herzlich, mit einer kleinen Geschichte im Text";
+            case EIGHTIES:
+                return "80er Synthpop — helle Synthesizer, elektronische Drum Machines, eingaengige Melodien, treibender Bass, polierter Sound mit Retro-Charme und Neon-Vibes";
             case HIPHOP:
                 return "HipHop — rhythmischer Sprechgesang, wortgewandt und kreativ, mit cleverem Wortspiel, fliessenden Reimen und einem eingaengigen Hook";
             case LULLABY:
