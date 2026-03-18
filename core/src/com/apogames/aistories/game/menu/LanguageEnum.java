@@ -1,21 +1,26 @@
 package com.apogames.aistories.game.menu;
 
+import com.apogames.common.Localization;
+import com.apogames.entity.DropdownOption;
+
 import java.util.Locale;
 
-public enum LanguageEnum {
-    DE(Locale.GERMAN, "button_language_de"),
-    EN(Locale.ENGLISH, "button_language_en"),
-    ES(new Locale("es", "ES"), "button_language_es"),
-    FR(Locale.FRENCH, "button_language_fr"),
-    IT(Locale.ITALIAN, "button_language_it"),
-    TR(new Locale("tr", "TR"), "button_language_tr");
+public enum LanguageEnum implements DropdownOption {
+    DE(Locale.GERMAN, "button_language_de", "language_name_de"),
+    EN(Locale.ENGLISH, "button_language_en", "language_name_en"),
+    ES(new Locale("es", "ES"), "button_language_es", "language_name_es"),
+    FR(Locale.FRENCH, "button_language_fr", "language_name_fr"),
+    IT(Locale.ITALIAN, "button_language_it", "language_name_it"),
+    TR(new Locale("tr", "TR"), "button_language_tr", "language_name_tr");
 
-    private Locale locale;
-    private String language;
+    private final Locale locale;
+    private final String languageKey;
+    private final String nameKey;
 
-    private LanguageEnum(Locale locale, String language) {
+    LanguageEnum(Locale locale, String languageKey, String nameKey) {
         this.locale = locale;
-        this.language = language;
+        this.languageKey = languageKey;
+        this.nameKey = nameKey;
     }
 
     public Locale getLocale() {
@@ -23,7 +28,17 @@ public enum LanguageEnum {
     }
 
     public String getLanguage() {
-        return language;
+        return languageKey;
+    }
+
+    @Override
+    public String getDropdownLabel() {
+        return Localization.getInstance().getCommon().get(nameKey);
+    }
+
+    @Override
+    public String getSelectedLabel() {
+        return languageKey;
     }
 
     public LanguageEnum getNext(int add) {

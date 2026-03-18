@@ -84,7 +84,7 @@ public class ButtonProvider {
             height = 64;
             x = 15;
             y = Constants.GAME_HEIGHT - height - 5;
-            button = new ApoButtonImageThree(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "button_language_de");
+            button = new ApoButtonDropdown(x, y, width, height, function, text, 0, 0, width, height, Constants.COLOR_BLACK, "button_language_de", com.apogames.aistories.game.menu.LanguageEnum.values());
             button.setFont(AssetLoader.font30);
             this.game.getButtons().add(button);
 

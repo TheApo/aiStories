@@ -9,6 +9,7 @@ import com.apogames.backend.DrawString;
 import com.apogames.backend.SequentiallyThinkingScreenModel;
 import com.apogames.common.Localization;
 import com.apogames.entity.ApoButton;
+import com.apogames.entity.ApoButtonDropdown;
 
 import java.util.Locale;
 
@@ -116,15 +117,25 @@ public class Menu extends SequentiallyThinkingScreenModel {
                 getMainPanel().changeToCreateSong();
                 break;
             case Menu.FUNCTION_LANGUAGE:
-                this.language = this.language.getNext(1);
-                Localization.getInstance().setLocale(this.language.getLocale());
-                getMainPanel().getButtonByFunction(function).setId(this.language.getLanguage());
+                ApoButton btn = getMainPanel().getButtonByFunction(FUNCTION_LANGUAGE);
+                if (btn instanceof ApoButtonDropdown) {
+                    ApoButtonDropdown dropdown = (ApoButtonDropdown) btn;
+                    LanguageEnum[] langs = LanguageEnum.values();
+                    int idx = dropdown.getSelectedIndex();
+                    if (idx >= 0 && idx < langs.length) {
+                        this.language = langs[idx];
+                        Localization.getInstance().setLocale(this.language.getLocale());
+                    }
+                }
                 break;
         }
     }
 
     private void setButtonsVisibility() {
-        getMainPanel().getButtonByFunction(FUNCTION_LANGUAGE).setId(this.language.getLanguage());
+        ApoButton btn = getMainPanel().getButtonByFunction(FUNCTION_LANGUAGE);
+        if (btn instanceof ApoButtonDropdown) {
+            ((ApoButtonDropdown) btn).setSelectedIndex(this.language.ordinal());
+        }
 
         if (Constants.IS_HTML) {
             getMainPanel().getButtonByFunction(Menu.FUNCTION_BACK).setVisible(false);
@@ -153,14 +164,6 @@ public class Menu extends SequentiallyThinkingScreenModel {
             button.render(this.getMainPanel());
         }
     }
-
-//	        Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
-//			Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
-//
-//			getMainPanel().getRenderer().begin(ShapeType.Line);
-//			getMainPanel().getRenderer().setColor(Constants.COLOR_WHITE[0], Constants.COLOR_WHITE[1], Constants.COLOR_WHITE[2], 1f);
-//			getMainPanel().getRenderer().roundedRectLine((WIDTH - width)/2f, startY, width, height, 5);
-//			getMainPanel().getRenderer().end();
 
     @Override
     public void dispose() {
