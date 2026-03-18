@@ -409,7 +409,7 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
         SongSettings.MusicStyle[] values = SongSettings.MusicStyle.values();
         String[] labels = new String[values.length];
         String[] keys = {"music_lullaby", "music_pop", "music_rock", "music_eighties",
-                "music_hiphop", "music_piano", "music_electronic", "music_musical"};
+                "music_hiphop", "music_piano", "music_electronic", "music_schlager"};
         for (int i = 0; i < values.length; i++) {
             labels[i] = Localization.getInstance().getCommon().get(keys[i]);
         }

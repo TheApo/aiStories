@@ -124,3 +124,6 @@ data/
 custom_images/
 
 .claude/
+proxy/
+
+teavm/

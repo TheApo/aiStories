@@ -4,6 +4,7 @@ import com.apogames.aistories.game.objects.EnumInterface;
 import com.apogames.aistories.game.objects.GameObjectives;
 import com.apogames.aistories.game.settings.SongSettings;
 import com.apogames.aistories.game.settings.StorySettings;
+import com.apogames.common.Localization;
 
 public class SongPrompt {
 
@@ -17,7 +18,8 @@ public class SongPrompt {
         return "Erstelle ein " + length + " im Stil von " + style + " fuer Hoerer im Alter von " + age + ".\n" +
                 ageTone + "\n" +
                 ageStructure + "\n" +
-                "Der Text muss sich reimen (AABB Schema): Reimpaare muessen die gleiche Silbenanzahl haben (gleiches Versmass). Eingaengig und singbar.";
+                "Der Text muss sich reimen (AABB Schema): Reimpaare muessen die gleiche Silbenanzahl haben (gleiches Versmass). Eingaengig und singbar." +
+                getLanguageInstruction();
     }
 
     public static String buildFullPrompt(SongSettings settings, GameObjectives objectives) {
@@ -59,7 +61,8 @@ public class SongPrompt {
                 + " fuer " + settings.getAgeDescription() + ". "
                 + getCompactAgeTone(settings.getAgeGroup()) + " "
                 + getCompactStructure(settings.getAgeGroup()) + " "
-                + "Text muss sich reimen (AABB), Reimpaare gleiche Silbenanzahl, eingaengig und singbar.";
+                + "Text muss sich reimen (AABB), Reimpaare gleiche Silbenanzahl, eingaengig und singbar."
+                + getCompactLanguageTag();
     }
 
     public static String buildObjectivesText(GameObjectives objectives) {
@@ -102,7 +105,12 @@ public class SongPrompt {
         sb.append("- Jede Zeile muss singbar sein: maximal 10 Woerter pro Zeile, keine langen Schachtelsaetze.\n");
         sb.append("- Schreibe KEINE Reimschema-Markierungen wie (A), (B) hinter die Zeilen.\n\n");
 
-        sb.append("Gib NUR den Liedtext aus, keine Erklaerungen oder Kommentare.\n\n");
+        sb.append("Gib NUR den Liedtext aus, keine Erklaerungen oder Kommentare.\n");
+        String langInstr = getLanguageInstruction();
+        if (!langInstr.isEmpty()) {
+            sb.append(langInstr).append("\n");
+        }
+        sb.append("\n");
 
         if (settings.isIncludeObjectives()) {
             if (objectives.getMainCharacter() != null) {
@@ -140,7 +148,8 @@ public class SongPrompt {
     public static String buildSunoStyle(SongSettings settings) {
         String style = getStyleDescription(settings.getMusicStyle())
                 + " fuer Hoerer im Alter von " + settings.getAgeDescription() + ". "
-                + getAgeMusicTone(settings.getAgeGroup());
+                + getAgeMusicTone(settings.getAgeGroup())
+                + getCompactLanguageTag();
         if (style.length() > SUNO_STYLE_MAX) {
             style = style.substring(0, SUNO_STYLE_MAX);
         }
@@ -170,16 +179,16 @@ public class SongPrompt {
         switch (length) {
             case SHORT:
                 return "Struktur (EXAKT einhalten, ALLE Abschnitte schreiben):\n"
-                        + "[Verse 1] (4 Zeilen)\n[Chorus] (4 Zeilen)\n[Chorus]\n[Outro] (2 Zeilen)\n"
+                        + "[Verse 1] (4 Zeilen)\n[Chorus] (4 Zeilen)\n[Verse 2] (4 Zeilen)\n[Chorus]\n[Chorus]\n[Outro] (2 Zeilen)\n"
                         + "Kurzes Lied, ca. 1:30-2:00 Minuten.";
             case MEDIUM:
                 return "Struktur (EXAKT einhalten, ALLE Abschnitte schreiben):\n"
-                        + "[Verse 1] (4-6 Zeilen)\n[Chorus] (4 Zeilen)\n[Verse 2] (4-6 Zeilen)\n[Chorus]\n[Bridge] (4 Zeilen)\n[Chorus]\n[Outro] (2-4 Zeilen)\n"
-                        + "Mittellanges Lied, ca. 2:30-3:00 Minuten.";
+                        + "[Verse 1] (4 oder 8 Zeilen)\n[Chorus] (4 Zeilen)\n[Verse 2] (4 oder 8 Zeilen)\n[Chorus]\n[Bridge] (4 Zeilen)\n[Chorus]\n[Outro] (4 Zeilen)\n"
+                        + "Mittellanges Lied, ca. 2:30-3:00 Minuten. Behalte die Zeilenanzahl in den Versen und Chorus ein, wenn du dich das erste mal für eins entschieden hast.";
             case LONG:
                 return "Struktur (EXAKT einhalten, ALLE Abschnitte schreiben):\n"
-                        + "[Intro] (2-4 Zeilen)\n[Verse 1] (6-8 Zeilen)\n[Chorus] (4-6 Zeilen)\n[Verse 2] (6-8 Zeilen)\n[Chorus]\n[Bridge] (4 Zeilen)\n[Chorus]\n[Verse 3] (6-8 Zeilen)\n[Chorus]\n[Outro] (2-4 Zeilen)\n"
-                        + "Langes Lied, ca. 3:30-4:00 Minuten.";
+                        + "[Intro] (2 oder 4 Zeilen)\n[Verse 1] (4 oder 8 Zeilen)\n[Chorus] (4 Zeilen)\n[Verse 2]\n[Chorus]\n[Bridge] (4 Zeilen)\n[Chorus]\n[Verse 3]\n[Chorus]\n[Chorus]\n[Outro] (4 Zeilen)\n"
+                        + "Langes Lied, ca. 3:30-4:00 Minuten. Behalte die Zeilenanzahl in den Versen und Chorus ein, wenn du dich das erste mal für eins entschieden hast.";
             default:
                 return "Struktur: [Verse 1], [Chorus], [Verse 2], [Chorus], [Outro].";
         }
@@ -268,7 +277,7 @@ public class SongPrompt {
             case LULLABY: return "Sanftes Schlaflied";
             case PIANO: return "Ruhiges emotionales Piano-Lied";
             case ELECTRONIC: return "Tanzbares Electronic-Lied";
-            case MUSICAL: return "Dramatisches Musical-Lied";
+            case SCHLAGER: return "Moderner deutscher Schlager-Hit";
             default: return "Eingaengiges Pop-Lied";
         }
     }
@@ -313,8 +322,8 @@ public class SongPrompt {
                 return "Piano — ruhig, emotional, sanfte Klaviermelodie, gefuehlvoll und introspektiv, mit zartem Ausdruck und beruhigender Atmosphaere";
             case ELECTRONIC:
                 return "Electronic/Dance — moderner, tanzbarer Beat, synthetische Klaenge, repetitiver eingaengiger Refrain der zum Bewegen einlaedt";
-            case MUSICAL:
-                return "Musical — theatralisch, dramatisch, mit emotionalen Hoehepunkten, ausdrueckstarkem Gesang und einer klaren Handlung im Lied";
+            case SCHLAGER:
+                return "Moderner deutscher Schlager — mitreissend, gefuehlvoll und tanzbar. Treibender Beat, grosse Emotionen, eingaengiger Ohrwurm-Refrain zum Mitsingen und Mitfeiern";
             default:
                 return "Pop — eingaengige Melodie, klarer Beat, leicht mitzusingen";
         }
@@ -370,5 +379,21 @@ public class SongPrompt {
             default:
                 return "Struktur: Mindestens 1 Strophe und 2 Refrains.";
         }
+    }
+
+    private static String getLanguageInstruction() {
+        String instruction = Localization.getInstance().getCommon().get("song_language_instruction");
+        if (instruction != null && !instruction.isEmpty()) {
+            return "\n" + instruction;
+        }
+        return "";
+    }
+
+    private static String getCompactLanguageTag() {
+        String tag = Localization.getInstance().getCommon().get("song_language_tag");
+        if (tag != null && !tag.isEmpty()) {
+            return " " + tag;
+        }
+        return "";
     }
 }

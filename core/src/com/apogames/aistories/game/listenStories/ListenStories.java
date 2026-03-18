@@ -183,6 +183,14 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 this.textEditor.setActive(false);
             }
         }
+
+        if (isBackgroundGeneration()) {
+            setButtonsInsivislbe();
+            getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(false);
+            getMainPanel().getButtonByFunction(FUNCTION_FONT_BIGGER).setVisible(true);
+            getMainPanel().getButtonByFunction(FUNCTION_FONT_SMALLER).setVisible(true);
+            updatePageButtonVisibility();
+        }
     }
 
     public boolean isStoryAvailable() {
@@ -596,6 +604,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         return !hasMp3 && !hasSongVariants && this.choosenReadStory >= 0 && this.running == Running.NONE;
     }
 
+    private boolean isBackgroundGeneration() {
+        if (this.running == Running.NONE) return false;
+        ArrayList<String> lines = getActiveDisplayLines();
+        return lines != null && !lines.isEmpty();
+    }
+
     private void updateAudioButtonVisibility() {
         boolean hasMp3 = this.choosenListenStory >= 0 || (this.songVariantHandles != null && this.songVariantHandles.length > 0);
         if (!hasMp3) {
@@ -961,6 +975,22 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         super.mouseButtonFunction(function);
 
         if (this.running != Running.NONE) {
+            if (isBackgroundGeneration()) {
+                switch (function) {
+                    case FUNCTION_FONT_BIGGER:
+                        this.setUpFont(+1);
+                        return;
+                    case FUNCTION_FONT_SMALLER:
+                        this.setUpFont(-1);
+                        return;
+                    case FUNCTION_NEXT_PAGE:
+                        this.nextPage(+1);
+                        return;
+                    case FUNCTION_PREVIOUS_PAGE:
+                        this.nextPage(-1);
+                        return;
+                }
+            }
             return;
         }
 
@@ -1105,6 +1135,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setId("button_read");
         setButtonsInsivislbe();
+        getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(false);
+        getMainPanel().getButtonByFunction(FUNCTION_FONT_BIGGER).setVisible(true);
+        getMainPanel().getButtonByFunction(FUNCTION_FONT_SMALLER).setVisible(true);
+        updatePageButtonVisibility();
 
         String title = extractTitleFromLyrics(lyrics);
         SunoApiIO sunoApi = new SunoApiIO(this);
@@ -1486,6 +1520,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                     getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(true);
                     getMainPanel().getButtonByFunction(FUNCTION_FONT_BIGGER).setVisible(true);
                     getMainPanel().getButtonByFunction(FUNCTION_FONT_SMALLER).setVisible(true);
+                    getMainPanel().getButtonByFunction(FUNCTION_NEXT_STORY).setVisible(true);
+                    getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_STORY).setVisible(true);
+                    getMainPanel().getButtonByFunction(FUNCTION_DELETE).setVisible(true);
 
                     ApoButton genBtn = getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3);
                     genBtn.setId("button_generate_song");
@@ -1504,12 +1541,17 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
                 this.saveText(text);
 
+                getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(true);
+                getMainPanel().getButtonByFunction(FUNCTION_NEXT_STORY).setVisible(true);
+                getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_STORY).setVisible(true);
+                getMainPanel().getButtonByFunction(FUNCTION_DELETE).setVisible(true);
                 reloadFileHandler();
             }
 
             Gdx.graphics.requestRendering();
         } else if (this.nextRunning != null) {
-            if (this.nextRunning == Running.NONE && (this.running == Running.CREATE_STORY || this.running == Running.CREATE_SONG)) {
+            if (this.nextRunning == Running.NONE && this.running != Running.NONE) {
+                getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(true);
                 getMainPanel().getButtonByFunction(FUNCTION_NEXT_STORY).setVisible(true);
                 getMainPanel().getButtonByFunction(FUNCTION_PREVIOUS_STORY).setVisible(true);
                 getMainPanel().getButtonByFunction(FUNCTION_DELETE).setVisible(true);
@@ -1517,6 +1559,15 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             }
 
             this.running = this.nextRunning;
+
+            if (isBackgroundGeneration()) {
+                setButtonsInsivislbe();
+                getMainPanel().getButtonByFunction(FUNCTION_BACK).setVisible(false);
+                getMainPanel().getButtonByFunction(FUNCTION_FONT_BIGGER).setVisible(true);
+                getMainPanel().getButtonByFunction(FUNCTION_FONT_SMALLER).setVisible(true);
+                updatePageButtonVisibility();
+            }
+
             if (this.nextRunning == Running.NONE) {
                 this.statusText = "";
             }
@@ -1559,7 +1610,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         // Story and audio info above book
         getMainPanel().spriteBatch.begin();
-        if (this.running != Running.CREATE_STORY) {
+        if (isBackgroundGeneration()) {
+            String genText = Localization.getInstance().getCommon().get(this.running.getId());
+            getMainPanel().drawString(genText, Constants.GAME_WIDTH / 2f, 50, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.MIDDLE, true, false);
+        } else if (this.running != Running.CREATE_STORY) {
             if (this.choosenReadStory >= 0) {
                 String fileLabel = (this.isSong ? "Song: " : "Story: ") + this.fileTXTHandles[this.choosenReadStory].file().getName();
                 getMainPanel().drawString(fileLabel, Constants.GAME_WIDTH / 2f, 50, Constants.COLOR_WHITE, AssetLoader.font20, DrawString.MIDDLE, true, false);
@@ -1639,23 +1693,36 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         // Loading overlay
         if (this.running != Running.NONE) {
             int width = 700;
+            float overlayX = Constants.GAME_WIDTH / 2f - width / 2f;
+            float overlayY;
+            int overlayHeight;
+
+            if (isBackgroundGeneration()) {
+                int row1Y = audioCapable ? ROW1_Y_NORMAL : ROW1_Y_EXTENDED;
+                overlayY = row1Y + ROW_HEIGHT + 10;
+                overlayHeight = Math.min(100, Constants.GAME_HEIGHT - (int) overlayY - 5);
+            } else {
+                overlayY = Constants.GAME_HEIGHT / 2f - 50;
+                overlayHeight = 100;
+            }
 
             Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
             getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
             getMainPanel().getRenderer().setColor(Constants.COLOR_WHITE[0], Constants.COLOR_WHITE[1], Constants.COLOR_WHITE[2], 0.8f);
-            getMainPanel().getRenderer().roundedRect(Constants.GAME_WIDTH / 2f - width / 2f, Constants.GAME_HEIGHT / 2f - 50, width, 100, 10);
+            getMainPanel().getRenderer().roundedRect(overlayX, overlayY, width, overlayHeight, 10);
             getMainPanel().getRenderer().end();
             Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
 
             getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Line);
             getMainPanel().getRenderer().setColor(Constants.COLOR_BLACK[0], Constants.COLOR_BLACK[1], Constants.COLOR_BLACK[2], 1f);
-            getMainPanel().getRenderer().roundedRectLine(Constants.GAME_WIDTH / 2f - width / 2f, Constants.GAME_HEIGHT / 2f - 50, width, 100, 10);
+            getMainPanel().getRenderer().roundedRectLine(overlayX, overlayY, width, overlayHeight, 10);
             getMainPanel().getRenderer().end();
 
+            float textY = overlayY + Math.max(5, overlayHeight / 2f - 30);
             getMainPanel().spriteBatch.begin();
-            getMainPanel().drawString(Localization.getInstance().getCommon().get(this.running.getId()), Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT / 2f - 30, Constants.COLOR_BLACK, AssetLoader.font40, DrawString.MIDDLE, false, false);
+            getMainPanel().drawString(Localization.getInstance().getCommon().get(this.running.getId()), Constants.GAME_WIDTH / 2f, textY, Constants.COLOR_BLACK, AssetLoader.font40, DrawString.MIDDLE, false, false);
             if (!this.statusText.isEmpty()) {
-                getMainPanel().drawString(this.statusText, Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT / 2f + 10, Constants.COLOR_BLACK, AssetLoader.font20, DrawString.MIDDLE, false, false);
+                getMainPanel().drawString(this.statusText, Constants.GAME_WIDTH / 2f, textY + 35, Constants.COLOR_BLACK, AssetLoader.font20, DrawString.MIDDLE, false, false);
             }
             getMainPanel().spriteBatch.end();
         }
@@ -1678,7 +1745,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
 
     private void renderButtonBackgrounds() {
-        if (this.running != Running.NONE) return;
+        boolean bgGen = isBackgroundGeneration();
+        if (this.running != Running.NONE && !bgGen) return;
 
         int row1Y = audioCapable ? ROW1_Y_NORMAL : ROW1_Y_EXTENDED;
 
@@ -1689,8 +1757,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.5f);
         getMainPanel().getRenderer().roundedRect(ROW_BG_X, row1Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
 
-        // Row 2: Audio background (only if audio capable)
-        if (audioCapable) {
+        // Row 2: Audio background (only if audio capable and not in background generation)
+        if (audioCapable && !bgGen) {
             getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.5f);
             getMainPanel().getRenderer().roundedRect(ROW_BG_X, ROW2_Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
         }
@@ -1698,8 +1766,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().getRenderer().end();
         Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
 
-        // Label and duration on audio row (only when MP3 exists)
-        if (this.choosenListenStory >= 0 || (this.songVariantHandles != null && this.songVariantHandles.length > 0)) {
+        // Label and duration on audio row (only when MP3 exists and not in background generation)
+        if (!bgGen && (this.choosenListenStory >= 0 || (this.songVariantHandles != null && this.songVariantHandles.length > 0))) {
             float textY = ROW2_Y + ROW_HEIGHT / 2f - 12;
             getMainPanel().spriteBatch.begin();
             String label;

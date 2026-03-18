@@ -16,7 +16,7 @@ public class SongSettings {
     }
 
     public enum MusicStyle {
-        LULLABY, POP, ROCK, EIGHTIES, HIPHOP, PIANO, ELECTRONIC, MUSICAL
+        LULLABY, POP, ROCK, EIGHTIES, HIPHOP, PIANO, ELECTRONIC, SCHLAGER
     }
 
     public enum SongLength {
