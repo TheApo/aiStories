@@ -276,7 +276,7 @@ public class SongPrompt {
             case HIPHOP: return "Rhythmisches HipHop-Lied";
             case LULLABY: return "Sanftes Schlaflied";
             case PIANO: return "Ruhiges emotionales Piano-Lied";
-            case ELECTRONIC: return "Tanzbares Electronic-Lied";
+            case TRANCE: return "Euphorisches Trance-Lied";
             case SCHLAGER: return "Moderner deutscher Schlager-Hit";
             default: return "Eingaengiges Pop-Lied";
         }
@@ -320,8 +320,8 @@ public class SongPrompt {
                 return "Schlaflied/Wiegenlied — sanft, beruhigend, langsames Tempo, weiche Melodie, wiederholende Muster die zum Einschlafen einladen";
             case PIANO:
                 return "Piano — ruhig, emotional, sanfte Klaviermelodie, gefuehlvoll und introspektiv, mit zartem Ausdruck und beruhigender Atmosphaere";
-            case ELECTRONIC:
-                return "Electronic/Dance — moderner, tanzbarer Beat, synthetische Klaenge, repetitiver eingaengiger Refrain der zum Bewegen einlaedt";
+            case TRANCE:
+                return "Trance — beat, melodisch, euphorisch, hypnotisch und energiegeladen. Treibender melodischer 4-on-the-floor Beat bei 138-145 BPM, schwebende Synthesizer-Pads, aufbauende Breakdowns mit emotionalen Melodien und ekstatische Drops. Eine Melodie zum Träumen ist immer hörbar. Repetitive, mantraartige Vocals die in den Flow ziehen";
             case SCHLAGER:
                 return "Moderner deutscher Schlager — mitreissend, gefuehlvoll und tanzbar. Treibender Beat, grosse Emotionen, eingaengiger Ohrwurm-Refrain zum Mitsingen und Mitfeiern";
             default:

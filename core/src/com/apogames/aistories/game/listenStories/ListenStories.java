@@ -291,7 +291,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             processAndLayoutChapters();
             this.textEditor.setDisplayData(this.textArea.getMyText(), new int[0], new java.util.HashSet<>());
         }
-        this.textEditor.setActive(editable);
+        this.textEditor.setActive(false);
         updatePageButtonVisibility();
     }
 
@@ -671,7 +671,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private float getPlaybackPosition() {
-        if (playbackStartNanos == 0 || music == null) return 0f;
+        if (music == null) return 0f;
+        if (playbackStartNanos == 0) return playbackStartOffset;
         float pos = playbackStartOffset + (System.nanoTime() - playbackStartNanos) / 1_000_000_000f;
         return Math.min(pos, totalDuration);
     }
@@ -943,12 +944,17 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.isPressed = true;
             return;
         }
-        if (this.textEditor.isActive() && !isRightButton) {
+        if (!isRightButton && isEditable()) {
+            if (!this.textEditor.isActive()) {
+                this.textEditor.setActive(true);
+                buildEditableLayout();
+            }
             int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
             boolean handled = this.textEditor.handleClick(x, y, this.fontSize, this.currentSpread,
                     rowsPerPage, this.fontSize.getNext(1).getFont(),
                     this.bookRenderer.getChapterLines());
             if (!handled) {
+                this.textEditor.setActive(false);
                 Gdx.input.setOnscreenKeyboardVisible(false);
                 MainPanel.clearActiveInput();
             }
@@ -1501,7 +1507,6 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 // Two-step flow: lyrics arrived from LLM → display in book for review
                 this.pendingSunoCustom = false;
                 this.fontSize = FontSize.FONT_25;
-                this.setTextInTextArea(text);
                 this.isSong = true;
 
                 if (text == null || text.trim().isEmpty()) {
@@ -1537,7 +1542,6 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                     this.nextRunning = null;
                 }
                 this.fontSize = FontSize.FONT_25;
-                this.setTextInTextArea(text);
 
                 this.saveText(text);
 
