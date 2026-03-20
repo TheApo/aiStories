@@ -1,6 +1,5 @@
 package com.apogames.aistories.game.main;
 
-import com.apogames.aistories.game.objects.EnumInterface;
 import com.apogames.aistories.game.objects.GameObjectives;
 import com.apogames.aistories.game.settings.SongSettings;
 import com.apogames.aistories.game.settings.StorySettings;

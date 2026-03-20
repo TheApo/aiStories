@@ -88,7 +88,7 @@ public class Prompt {
         }
 
         return typeIntro + "\n" +
-                "Die Geschichte soll gut strukturiert, in " + chapters + " Kapiteln unterteilt und etwa " + charCount + " Zeichen lang sein.\n" +
+                "Die Geschichte soll gut strukturiert, in " + chapters + " Kapiteln unterteilt und ungefähr " + charCount + " Zeichen lang sein. (NICHT mehr als "+(charCount+1000)+" Zeichen!)\n" +
                 "Sie soll eine Mischung aus Humor, Abenteuer und Emotionen enthalten, sodass Kinder sich mit den Charakteren identifizieren koennen.\n\n" +
                 typeStyle + "\n" +
                 "Achte darauf, dass die Geschichte eine runde Handlung mit einer spannenden Einleitung, einer abenteuerlichen Mitte und einem schoenen Abschluss hat.";

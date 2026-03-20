@@ -1252,7 +1252,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.pendingSunoReady = true;
             this.savedSongFilePrefix = searchName;
         } else if (!hasMp3 && !isSong) {
-            getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(true);
+            ApoButton genBtn = getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3);
+            genBtn.setId("button_read");
+            genBtn.setVisible(true);
         } else {
             getMainPanel().getButtonByFunction(FUNCTION_CREATEMP3).setVisible(false);
         }

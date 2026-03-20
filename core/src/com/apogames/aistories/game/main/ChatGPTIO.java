@@ -78,11 +78,11 @@ public class ChatGPTIO {
         Map<String, Object> params = new HashMap<>();
         params.put("model", llm);
         params.put("messages", conversationHistory);
-        params.put("temperature", 1);
+        params.put("temperature", 0.7);
         if (llm.startsWith("gpt-5")) {
             params.put("max_completion_tokens", 16384);
         } else {
-            params.put("max_tokens", 4096);
+            params.put("max_tokens", 16384);
         }
         Gdx.app.log("ChatGPT", "Sending to OpenAI: model=" + llm + " messages=" + conversationHistory.size());
 
@@ -283,82 +283,6 @@ public class ChatGPTIO {
         systemMessage.put("role", "system");
         systemMessage.put("content", systemPrompt);
         conversationHistory.add(systemMessage);
-    }
-
-
-
-    /**
-     * Diese Methode sendet einen Request an einen Bildgenerierungs-Endpunkt (z. B. DALL-E).
-     * @param sectionIdentifier Eine eindeutige Kennung für den Abschnitt bzw. Charakter (z. B. "mainCharacter").
-     *                          Wird als Schlüssel im Cache genutzt.
-     * @param sectionText Der Textabschnitt, der als Grundlage für die Bildgenerierung dienen soll.
-     */
-    public void sendImageRequest(String sectionIdentifier, String sectionText) {
-        // Falls bereits ein Bild für diesen Identifier existiert, verwende den Cache.
-        if (imageCache.containsKey(sectionIdentifier)) {
-            String imageUrl = imageCache.get(sectionIdentifier);
-            Gdx.app.log("Image", "Using cached image for " + sectionIdentifier + ": " + imageUrl);
-            main.onImageReceived(sectionIdentifier, imageUrl);
-            return;
-        }
-
-        // Prompt für die Bildgenerierung erstellen
-        String imagePrompt = "Create a small illustration for the following section of a children's story. " +
-                "Ensure that the main character appears consistently with previous illustrations. " +
-                "Section text: " + sectionText;
-
-        Map<String, Object> params = new HashMap<>();
-        params.put("prompt", imagePrompt);
-        params.put("n", 1);                  // Anzahl der zu generierenden Bilder
-        params.put("size", "256x256");         // Gewünschte Bildgröße
-
-        // Endpunkt für die Bildgenerierung (z. B. DALL-E)
-        String imageApiUrl = "https://api.openai.com/v1/images/generations";
-
-        HttpRequestBuilder builder = new HttpRequestBuilder();
-        HttpRequest request = builder.newRequest()
-                .method(HttpMethods.POST)
-                .url(imageApiUrl)
-                .timeout(90000)
-                .header("Authorization", "Bearer " + API_KEY)
-                .header("Content-Type", "application/json")
-                .content(gson.toJson(params))
-                .build();
-
-        Gdx.net.sendHttpRequest(request, new HttpResponseListener() {
-            @Override
-            public void handleHttpResponse(HttpResponse httpResponse) {
-                String responseStr = httpResponse.getResultAsString();
-                Gdx.app.log("HTTP", "Response from image API: " + responseStr);
-
-                try {
-                    Map<String, Object> response = gson.fromJson(responseStr, Map.class);
-                    if (response == null) {
-                        Gdx.app.error("HTTP", "Failed to parse image response");
-                        return;
-                    }
-                    List<Map<String, Object>> data = (List<Map<String, Object>>) response.get("data");
-                    if (data != null && !data.isEmpty()) {
-                        // Nimm die URL des ersten generierten Bildes
-                        String imageUrl = (String) data.get(0).get("url");
-                        imageCache.put(sectionIdentifier, imageUrl);
-                        main.onImageReceived(sectionIdentifier, imageUrl);
-                    }
-                } catch(Exception e) {
-                    Gdx.app.error("HTTP", "Error processing image response", e);
-                }
-            }
-
-            @Override
-            public void failed(Throwable t) {
-                Gdx.app.error("HTTP", "Image request failed", t);
-            }
-
-            @Override
-            public void cancelled() {
-                Gdx.app.log("HTTP", "Image request cancelled");
-            }
-        });
     }
 
 }
