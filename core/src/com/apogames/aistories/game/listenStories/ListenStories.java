@@ -46,7 +46,6 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     public static final String FUNCTION_DELETE = "LISTEN_DELETE";
     public static final String FUNCTION_SONG_VARIANT = "LISTEN_SONG_VARIANT";
 
-    private final boolean[] keys = new boolean[256];
 
     private boolean isPressed = false;
 
@@ -178,8 +177,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 this.textArea.setText(promptText);
                 this.textEditor.setText(promptText);
                 this.textEditor.setFont(this.fontSize.getFont());
-                processAndLayoutChapters();
-                this.textEditor.setDisplayData(this.textArea.getMyText(), new int[0], new java.util.HashSet<>());
+                buildEditableLayout();
                 this.textEditor.setActive(false);
             }
         }
@@ -284,13 +282,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.textEditor.setText(cleaned);
         this.textEditor.setFont(this.fontSize.getFont());
 
-        boolean editable = isEditable();
-        if (editable) {
-            buildEditableLayout();
-        } else {
-            processAndLayoutChapters();
-            this.textEditor.setDisplayData(this.textArea.getMyText(), new int[0], new java.util.HashSet<>());
-        }
+        buildEditableLayout();
         this.textEditor.setActive(false);
         updatePageButtonVisibility();
     }
@@ -376,10 +368,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 }
             }
 
-            // Strip "Kapitel" word, keep number
-            String heading = BookRenderer.stripChapterWord(fullHeading.toString());
-
             // Re-wrap heading with heading font
+            String heading = fullHeading.toString();
             ArrayList<String> wrapped = wrapTextForFont(heading, headingFont, maxWidth);
             int rp = headingRawStart;
             for (String wLine : wrapped) {
@@ -434,7 +424,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     private ArrayList<String> getActiveDisplayLines() {
-        if (this.textEditor.isActive() && !this.textEditor.getDisplayLines().isEmpty()) {
+        if (!this.textEditor.getDisplayLines().isEmpty()) {
             return new ArrayList<>(this.textEditor.getDisplayLines());
         }
         return this.textArea.getMyText();
@@ -460,6 +450,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             String original = lines[i].trim();
             boolean isHeading = original.startsWith("#") || BookRenderer.isChapterHeading(original);
             String line = original.replaceAll("^#+\\s*", "").trim();
+            if (BookRenderer.isChapterHeading(line)) {
+                line = BookRenderer.stripChapterWord(line);
+            }
             if (i > 0) sb.append("\n");
             sb.append(line);
             // Ensure blank line after heading so body text is separated
@@ -521,8 +514,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 lastIdx = j;
             }
 
-            // Strip "Kapitel" word, keep number
-            String heading = BookRenderer.stripChapterWord(fullText.toString());
+            String heading = fullText.toString();
 
             // Remove old heading lines
             for (int j = lastIdx; j >= i; j--) {
@@ -843,7 +835,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         String fileName = dirString+this.prompt.getFileNameTxt();
         Gdx.app.log("SaveText", "saveText " + ids+" "+fileName);
         FileHandle fileHandle = Gdx.files.local(fileName);
-        fileHandle.writeString(ids+text, false);
+        fileHandle.writeString(ids+cleanText(text), false);
     }
 
     private void saveSongText(String text) {
@@ -877,9 +869,6 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     @Override
     public void keyPressed(int keyCode, char character) {
         super.keyPressed(keyCode, character);
-        keys[keyCode] = true;
-
-        // keyDown: only navigation keys for the editor (key repeat)
         if (this.textEditor.isActive()) {
             this.textEditor.keyDown(keyCode);
             ensureCursorVisible();
@@ -887,25 +876,21 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     }
 
     @Override
+    public void keyCharacterTyped(char character) {
+        if (this.textEditor.isActive()) {
+            this.textEditor.addTypedCharacter(character);
+            handleEditorTextChange();
+            ensureCursorVisible();
+        }
+    }
+
+    @Override
     public void keyButtonReleased(int keyCode, char character) {
-        super.keyButtonReleased(keyCode, character);
-
-        if (keys[keyCode]) {
-            // This is a real keyUp event (keyDown set keys[keyCode]=true)
-            keys[keyCode] = false;
-
-            if (this.textEditor.isActive()) {
-                // Ctrl combos are handled on keyUp, like in Textfield
-                this.textEditor.keyUp(keyCode);
-                handleEditorTextChange();
-            }
+        if (this.textEditor.isActive()) {
+            this.textEditor.keyUp(keyCode);
+            handleEditorTextChange();
         } else {
-            // This is a keyTyped event (character is the real typed char)
-            if (this.textEditor.isActive()) {
-                this.textEditor.addTypedCharacter(character);
-                handleEditorTextChange();
-                ensureCursorVisible();
-            }
+            super.keyButtonReleased(keyCode, character);
         }
     }
 
@@ -1383,11 +1368,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.textArea.setFont(this.fontSize.getFont());
         this.textArea.setText(this.textArea.getText());
         this.textEditor.setFont(this.fontSize.getFont());
-        if (this.textEditor.isActive()) {
-            buildEditableLayout();
-        } else {
-            processAndLayoutChapters();
-        }
+        buildEditableLayout();
         rebuildHighlighterMapping();
         updatePageButtonVisibility();
 

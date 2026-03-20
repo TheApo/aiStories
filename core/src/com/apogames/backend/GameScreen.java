@@ -61,6 +61,7 @@ public class GameScreen implements Screen, InputProcessor {
     private final ArrayList<GridPoint2> mouseMovedArray = new ArrayList<GridPoint2>();
     private final ArrayList<Integer> keyPressedArray = new ArrayList<Integer>();
     private final ArrayList<Integer> keyReleasedArray = new ArrayList<Integer>();
+    private final ArrayList<Character> keyTypedArray = new ArrayList<Character>();
     /**
      * The Sprite batch.
      */
@@ -154,11 +155,7 @@ public class GameScreen implements Screen, InputProcessor {
         if (renderer == null) {
             renderer = new MyShapeRenderer();
         }
-        renderer.setProjectionMatrix(cam.combined);
-
-        spriteBatch.setProjectionMatrix(cam.combined);
-
-        viewport.update(lastViewPortResizeWidth, lastViewPortResizeHeight);
+        applyResize(lastViewPortResizeWidth, lastViewPortResizeHeight);
     }
 
     /**
@@ -185,6 +182,7 @@ public class GameScreen implements Screen, InputProcessor {
      * @param delta the delta
      */
     public void think(float delta) {
+        checkWindowResize();
         if (!this.mouseMovedArray.isEmpty()) {
             for (GridPoint2 aClickPressedArray : mouseMovedArray) {
                 this.model.mouseMoved(aClickPressedArray.x, aClickPressedArray.y);
@@ -233,6 +231,12 @@ public class GameScreen implements Screen, InputProcessor {
                 this.model.keyPressed(aKeyPressedArray, (char) (aKeyPressedArray.intValue()));
             }
             keyPressedArray.clear();
+        }
+        if (!this.keyTypedArray.isEmpty()) {
+            for (Character c : keyTypedArray) {
+                this.model.keyCharacterTyped(c);
+            }
+            keyTypedArray.clear();
         }
         if (!this.keyReleasedArray.isEmpty()) {
             for (Integer aKeyReleasedArray : keyReleasedArray) {
@@ -358,13 +362,27 @@ public class GameScreen implements Screen, InputProcessor {
         drawString(title, Constants.GAME_WIDTH / 2f, 20, titleColor, AssetLoader.fontTitle, DrawString.MIDDLE, false, false);
     }
 
+    private void checkWindowResize() {
+        if (headless) return;
+        int w = Gdx.graphics.getWidth();
+        int h = Gdx.graphics.getHeight();
+        if (w > 0 && h > 0 && (w != lastViewPortResizeWidth || h != lastViewPortResizeHeight)) {
+            applyResize(w, h);
+        }
+    }
+
+    private void applyResize(int width, int height) {
+        lastViewPortResizeWidth = width;
+        lastViewPortResizeHeight = height;
+        viewport.update(width, height);
+        renderer.setProjectionMatrix(cam.combined);
+        spriteBatch.setProjectionMatrix(cam.combined);
+    }
+
     @Override
     public void resize(int width, int height) {
-        if (!headless) {
-            Gdx.app.log("GameScreen", "resizing " + width + " " + height);
-            viewport.update(width, height);
-            lastViewPortResizeWidth = width;
-            lastViewPortResizeHeight = height;
+        if (!headless && width > 0 && height > 0) {
+            applyResize(width, height);
         }
     }
 
@@ -485,7 +503,7 @@ public class GameScreen implements Screen, InputProcessor {
     public boolean keyTyped(char character) {
         if (this.model != null) {
             if ((int) character != 0) {
-                keyReleasedArray.add((int) character);
+                keyTypedArray.add(character);
             }
         }
         return false;

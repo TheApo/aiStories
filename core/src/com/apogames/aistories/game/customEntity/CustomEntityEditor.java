@@ -58,7 +58,6 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     private enum Mode { GRID, GENERATE, MANAGE }
     private enum CharacterEditMode { BUILTIN, PROFILE, NEW }
 
-    private final boolean[] keys = new boolean[256];
 
     private CustomEntity customEntity;
 
@@ -420,31 +419,25 @@ public class CustomEntityEditor extends SequentiallyThinkingScreenModel {
     @Override
     public void keyPressed(int keyCode, char character) {
         super.keyPressed(keyCode, character);
-        if (keyCode >= 0 && keyCode < keys.length) {
-            if (keys[keyCode]) return;
-            keys[keyCode] = true;
-        }
         if (this.activeField != null) {
-            this.activeField.handleNavigationKey(keyCode);
+            this.activeField.keyDown(keyCode);
+        }
+    }
+
+    @Override
+    public void keyCharacterTyped(char character) {
+        if (this.activeField != null) {
+            this.activeField.addTypedCharacter(character);
         }
     }
 
     @Override
     public void keyButtonReleased(int keyCode, char character) {
-        if (keyCode >= 0 && keyCode < keys.length && keys[keyCode]) {
-            keys[keyCode] = false;
-            if (this.activeField != null) {
-                return;
-            }
-        }
         if (this.activeField != null) {
-            if (character == 8 || character == 127 || character == 10 || character == 13
-                    || (!Character.isISOControl(character) && Character.isDefined(character))) {
-                this.activeField.addTypedCharacter(character);
-                return;
-            }
+            this.activeField.keyUp(keyCode);
+        } else {
+            super.keyButtonReleased(keyCode, character);
         }
-        super.keyButtonReleased(keyCode, character);
     }
 
     @Override

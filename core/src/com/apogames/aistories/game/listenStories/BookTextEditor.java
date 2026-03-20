@@ -98,52 +98,7 @@ public class BookTextEditor extends Textfield {
         return result;
     }
 
-    // --- Navigation with shift-selection and book display lines ---
-
-    @Override
-    public boolean handleNavigationKey(int keyCode) {
-        boolean shift = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT)
-                || Gdx.input.isKeyPressed(Input.Keys.SHIFT_RIGHT);
-        int oldPos = position;
-        if (shift && selectedPosition.x < 0) {
-            selectedPosition.set(position, position);
-        }
-
-        switch (keyCode) {
-            case Input.Keys.LEFT:  setPosition(position - 1); break;
-            case Input.Keys.RIGHT: setPosition(position + 1); break;
-            case Input.Keys.HOME:  navigateHome(); break;
-            case Input.Keys.END:   navigateEnd(); break;
-            case Input.Keys.UP:    navigateUp(); break;
-            case Input.Keys.DOWN:  navigateDown(); break;
-            default: return false;
-        }
-
-        if (shift) {
-            updateSelectionTo(position, oldPos);
-        } else {
-            clearSelection();
-        }
-        return true;
-    }
-
-    private void updateSelectionTo(int newPos, int oldPos) {
-        if (selectedPosition.x < 0) {
-            selectedPosition.set(Math.min(oldPos, newPos), Math.max(oldPos, newPos));
-        } else {
-            if (oldPos == selectedPosition.y) {
-                selectedPosition.y = newPos;
-            } else {
-                selectedPosition.x = newPos;
-            }
-            if (selectedPosition.x > selectedPosition.y) {
-                int tmp = selectedPosition.x;
-                selectedPosition.x = selectedPosition.y;
-                selectedPosition.y = tmp;
-            }
-            if (selectedPosition.x == selectedPosition.y) clearSelection();
-        }
-    }
+    // --- Navigation with book display lines ---
 
     @Override
     protected void navigateHome() {

@@ -30,7 +30,6 @@ public class CreativeTonie extends SequentiallyThinkingScreenModel implements Ma
     private final int width = 700;
     private final int height = 550;
 
-    private final boolean[] keys = new boolean[256];
 
     private boolean isPressed = false;
 
@@ -186,17 +185,8 @@ public class CreativeTonie extends SequentiallyThinkingScreenModel implements Ma
     }
 
     @Override
-    public void keyPressed(int keyCode, char character) {
-        super.keyPressed(keyCode, character);
-
-        keys[keyCode] = true;
-    }
-
-    @Override
     public void keyButtonReleased(int keyCode, char character) {
         super.keyButtonReleased(keyCode, character);
-
-        keys[keyCode] = false;
     }
 
     public void mouseMoved(int mouseX, int mouseY) {

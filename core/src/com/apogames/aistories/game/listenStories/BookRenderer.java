@@ -113,7 +113,9 @@ public class BookRenderer {
 
     public static boolean isChapterHeading(String line) {
         if (line == null || line.trim().isEmpty()) return false;
-        return line.trim().matches("(?i)" + CHAPTER_WORDS_PATTERN + "\\s+.*");
+        String trimmed = line.trim();
+        if (trimmed.matches("(?i)" + CHAPTER_WORDS_PATTERN + "\\s+.*")) return true;
+        return trimmed.matches("^\\d+[.:;\\-–—]\\s+.*");
     }
 
     public static String stripChapterWord(String heading) {

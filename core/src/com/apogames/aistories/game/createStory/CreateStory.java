@@ -29,7 +29,6 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
     public static final String FUNCTION_NEWPROMPT = "CREATESTORY_NEWPROMPT";
     public static final String FUNCTION_SETTINGS = "CREATESTORY_SETTINGS";
 
-    private final boolean[] keys = new boolean[256];
 
     private boolean isPressed = false;
 
@@ -192,17 +191,8 @@ public class CreateStory extends SequentiallyThinkingScreenModel {
     }
 
     @Override
-    public void keyPressed(int keyCode, char character) {
-        super.keyPressed(keyCode, character);
-
-        keys[keyCode] = true;
-    }
-
-    @Override
     public void keyButtonReleased(int keyCode, char character) {
         super.keyButtonReleased(keyCode, character);
-
-        keys[keyCode] = false;
     }
 
     public void mouseMoved(int mouseX, int mouseY) {

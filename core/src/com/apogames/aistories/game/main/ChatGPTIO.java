@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 public class ChatGPTIO {
-    public static final String LLM_MODEL_MINI = "gpt-5-mini";
+    public static final String LLM_MODEL_MINI = "gpt-5.4-mini";
     public static final String LLM_MODEL_GEMINI = "gemini-3-flash-preview";
     public static String API_KEY;
     public static String GEMINI_API_KEY;

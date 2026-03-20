@@ -62,7 +62,6 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
 
     private static final int TILE_RADIUS = 5;
 
-    private final boolean[] keys = new boolean[256];
     private Textfield promptField;
     private Textfield objectivesField;
     private ApoButtonCheckIcon toggleButton;
@@ -248,28 +247,26 @@ public class SongSettingsScreen extends SequentiallyThinkingScreenModel {
     @Override
     public void keyPressed(int keyCode, char character) {
         super.keyPressed(keyCode, character);
-        keys[keyCode] = true;
         if (promptField.isSelect()) {
             promptField.keyDown(keyCode);
         }
     }
 
     @Override
+    public void keyCharacterTyped(char character) {
+        if (promptField.isSelect()) {
+            promptField.addTypedCharacter(character);
+            updateObjectivesPreview();
+        }
+    }
+
+    @Override
     public void keyButtonReleased(int keyCode, char character) {
-        if (keyCode >= 0 && keyCode < keys.length && !keys[keyCode]) {
-            if (promptField.isSelect()) {
-                promptField.addTypedCharacter(character);
-                updateObjectivesPreview();
-            }
-            return;
-        }
-        super.keyButtonReleased(keyCode, character);
-        if (keyCode >= 0 && keyCode < keys.length) {
-            keys[keyCode] = false;
-        }
         if (promptField.isSelect()) {
             promptField.keyUp(keyCode);
             updateObjectivesPreview();
+        } else {
+            super.keyButtonReleased(keyCode, character);
         }
     }
 

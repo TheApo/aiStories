@@ -97,6 +97,10 @@ public abstract class ScreenModel implements Disposable {
      * @param button    the button
      * @param character the character
      */
+    public void keyCharacterTyped(char character) {
+        // Optional hook for typed characters (text input)
+    }
+
     public void keyButtonReleased(int button, char character) {
         for (int exitCode : KeyCodes.EXIT) {
             if (button == exitCode) {

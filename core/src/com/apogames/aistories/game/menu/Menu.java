@@ -25,7 +25,6 @@ public class Menu extends SequentiallyThinkingScreenModel {
 
     public static final String FUNCTION_CREATESONG = "MENU_CREATESONG";
 
-    private final boolean[] keys = new boolean[256];
 
     private boolean isPressed = false;
 
@@ -66,17 +65,8 @@ public class Menu extends SequentiallyThinkingScreenModel {
     }
 
     @Override
-    public void keyPressed(int keyCode, char character) {
-        super.keyPressed(keyCode, character);
-
-        keys[keyCode] = true;
-    }
-
-    @Override
     public void keyButtonReleased(int keyCode, char character) {
         super.keyButtonReleased(keyCode, character);
-
-        keys[keyCode] = false;
     }
 
     public void mouseMoved(int mouseX, int mouseY) {
