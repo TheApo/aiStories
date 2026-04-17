@@ -98,11 +98,18 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private String fileMetadataPrefix = "";
 
     private static final int ROW1_Y_NORMAL = 580;
-    private static final int ROW2_Y = 700;
+    private static final int ROW2_Y = 715;
     private static final int ROW1_Y_EXTENDED = 660;
     private static final int ROW_HEIGHT = 70;
     private static final int ROW_BG_WIDTH = 560;
     private static final int ROW_BG_X = Constants.GAME_WIDTH / 2 - ROW_BG_WIDTH / 2;
+
+    private static final int WAVE_Y = 665;
+    private static final int WAVE_H = 50;
+
+    private DecorativeWaveform waveform;
+    private boolean isScrubbing = false;
+    private float scrubPosition = 0f;
 
     private Running running = Running.NONE;
     private boolean audioCapable = false;
@@ -922,11 +929,20 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     public void mouseButtonReleased(int mouseX, int mouseY, boolean isRightButton) {
         this.isPressed = false;
+        if (!isRightButton && this.isScrubbing) {
+            commitScrub();
+        }
     }
 
     public void mousePressed(int x, int y, boolean isRightButton) {
         if (isRightButton && !this.isPressed) {
             this.isPressed = true;
+            return;
+        }
+        if (!isRightButton && isWaveformInteractive() && this.waveform.intersects(x, y)) {
+            this.isScrubbing = true;
+            this.scrubPosition = this.waveform.positionForX(x, this.totalDuration);
+            Gdx.graphics.requestRendering();
             return;
         }
         if (!isRightButton && isEditable()) {
@@ -953,12 +969,40 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             }
             return;
         }
+        if (this.isScrubbing && this.waveform != null) {
+            this.scrubPosition = this.waveform.positionForX(x, this.totalDuration);
+            Gdx.graphics.requestRendering();
+            return;
+        }
         if (this.textEditor.isActive()) {
             int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
             this.textEditor.handleDrag(x, y, this.fontSize, this.currentSpread,
                     rowsPerPage, this.fontSize.getNext(1).getFont(),
                     this.bookRenderer.getChapterLines());
         }
+    }
+
+    private boolean isWaveformInteractive() {
+        return this.waveform != null
+                && this.waveform.isVisible()
+                && this.music != null
+                && this.totalDuration > 0f
+                && this.audioCapable
+                && this.running == Running.NONE;
+    }
+
+    private void commitScrub() {
+        this.isScrubbing = false;
+        if (this.music == null || this.totalDuration <= 0f) return;
+        float target = this.scrubPosition;
+        if (target < 0f) target = 0f;
+        if (target > this.totalDuration) target = this.totalDuration;
+        boolean wasPlaying = this.music.isPlaying();
+        this.music.setPosition(target);
+        this.playbackStartOffset = target;
+        this.playbackStartNanos = wasPlaying ? System.nanoTime() : 0;
+        this.lastRenderedSecond = -1;
+        Gdx.graphics.requestRendering();
     }
 
     @Override
@@ -1052,12 +1096,15 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.music.dispose();
             this.music = null;
         }
+        this.waveform = null;
+        this.isScrubbing = false;
         this.highlighter = null;
         this.timingData = null;
 
         // Delete song variant MP3s
         if (this.isSong && this.songVariantHandles != null) {
             for (FileHandle variant : this.songVariantHandles) {
+                WaveformLoader.deleteCache(variant);
                 deleteFileWithNio(variant.file());
             }
             this.songVariantHandles = null;
@@ -1065,6 +1112,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             FileHandle mp3FileHandle = this.fileMP3Handles[this.choosenListenStory];
             File mp3File = mp3FileHandle.file();
             Gdx.app.log("DELETE", "MP3 path: " + mp3File.getAbsolutePath());
+            WaveformLoader.deleteCache(mp3FileHandle);
             deleteFileWithNio(mp3File);
 
             // Delete associated JSON timing file
@@ -1209,6 +1257,8 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.music.dispose();
             this.music = null;
         }
+        this.waveform = null;
+        this.isScrubbing = false;
         this.totalDuration = 0f;
         this.timingData = null;
         this.highlighter = null;
@@ -1273,6 +1323,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void loadMusicFromFile(FileHandle fileHandle, String searchName) {
         this.music = Gdx.audio.newMusic(fileHandle);
+        this.waveform = new DecorativeWaveform(ROW_BG_X + 5, WAVE_Y, ROW_BG_WIDTH - 10, WAVE_H, fileHandle.name());
+        this.isScrubbing = false;
+        this.scrubPosition = 0f;
+        startWaveformLoad(fileHandle, this.waveform);
         this.playbackStartNanos = 0;
         this.playbackStartOffset = 0f;
         this.music.setOnCompletionListener(m -> {
@@ -1324,6 +1378,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             }
         }
         this.music = Gdx.audio.newMusic(variantFile);
+        this.waveform = new DecorativeWaveform(ROW_BG_X + 5, WAVE_Y, ROW_BG_WIDTH - 10, WAVE_H, variantFile.name());
+        this.isScrubbing = false;
+        this.scrubPosition = 0f;
+        startWaveformLoad(variantFile, this.waveform);
         this.playbackStartNanos = 0;
         this.playbackStartOffset = 0f;
         this.music.setOnCompletionListener(m -> {
@@ -1666,7 +1724,6 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
         drawGameObjectives();
 
-        getMainPanel().drawString("Version: " + Constants.VERSION, Constants.GAME_WIDTH / 2f, Constants.GAME_HEIGHT - 20f, Constants.COLOR_WHITE, AssetLoader.font15, DrawString.MIDDLE, false, false);
         getMainPanel().spriteBatch.end();
 
         // Semi-transparent backgrounds behind button rows
@@ -1744,14 +1801,24 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.5f);
         getMainPanel().getRenderer().roundedRect(ROW_BG_X, row1Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
 
-        // Row 2: Audio background (only if audio capable and not in background generation)
+        // Row 2: Unified audio background (waveform + buttons + labels)
         if (audioCapable && !bgGen) {
+            boolean hasAudio = this.music != null && this.waveform != null && this.totalDuration > 0f;
             getMainPanel().getRenderer().setColor(0f, 0f, 0f, 0.5f);
-            getMainPanel().getRenderer().roundedRect(ROW_BG_X, ROW2_Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
+            if (hasAudio) {
+                int unifiedH = WAVE_H + ROW_HEIGHT;
+                getMainPanel().getRenderer().roundedRect(ROW_BG_X, WAVE_Y, ROW_BG_WIDTH, unifiedH, 10);
+            } else {
+                getMainPanel().getRenderer().roundedRect(ROW_BG_X, ROW2_Y, ROW_BG_WIDTH, ROW_HEIGHT, 10);
+            }
         }
 
         getMainPanel().getRenderer().end();
         Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
+
+        if (audioCapable && !bgGen) {
+            renderWaveform();
+        }
 
         // Label and duration on audio row (only when MP3 exists and not in background generation)
         if (!bgGen && (this.choosenListenStory >= 0 || (this.songVariantHandles != null && this.songVariantHandles.length > 0))) {
@@ -1766,11 +1833,64 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             getMainPanel().drawString(label, ROW_BG_X + 15, textY, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.BEGIN, false, false);
 
             if (this.music != null && this.totalDuration > 0) {
-                String timeDisplay = formatTime(getPlaybackPosition()) + " / " + formatTime(this.totalDuration);
+                float shown = this.isScrubbing ? this.scrubPosition : getPlaybackPosition();
+                String timeDisplay = formatTime(shown) + " / " + formatTime(this.totalDuration);
                 getMainPanel().drawString(timeDisplay, ROW_BG_X + ROW_BG_WIDTH - 15, textY, Constants.COLOR_WHITE, AssetLoader.font25, DrawString.END, false, false);
             }
             getMainPanel().spriteBatch.end();
         }
+    }
+
+    private void startWaveformLoad(final FileHandle mp3, final DecorativeWaveform target) {
+        WaveformLoader.loadAsync(mp3, DecorativeWaveform.BAR_COUNT, new WaveformLoader.Callback() {
+            @Override
+            public void onHeights(float[] heights) {
+                if (ListenStories.this.waveform == target) {
+                    target.setHeights(heights);
+                    Gdx.graphics.requestRendering();
+                }
+            }
+        });
+    }
+
+    private void renderWaveform() {
+        if (this.waveform == null || this.music == null || this.totalDuration <= 0f) return;
+
+        float x = this.waveform.getX();
+        float y = this.waveform.getY();
+        float w = this.waveform.getWidth();
+        float h = this.waveform.getHeight();
+        float cy = y + h / 2f;
+
+        float displayPosition = this.isScrubbing ? this.scrubPosition : getPlaybackPosition();
+        float playheadX = this.waveform.xForPosition(displayPosition, this.totalDuration);
+
+        Gdx.graphics.getGL20().glEnable(GL20.GL_BLEND);
+        getMainPanel().getRenderer().begin(ShapeRenderer.ShapeType.Filled);
+
+        float maxBarH = h - 10f;
+        float slot = w / DecorativeWaveform.BAR_COUNT;
+        float barW = slot - 1f;
+        if (barW < 1f) barW = 1f;
+
+        for (int i = 0; i < DecorativeWaveform.BAR_COUNT; i++) {
+            float bx = x + i * slot + (slot - barW) / 2f;
+            float barH = this.waveform.getBarHeight(i) * maxBarH;
+            float byy = cy - barH / 2f;
+            boolean played = (bx + barW / 2f) < playheadX;
+            if (played) {
+                getMainPanel().getRenderer().setColor(Constants.COLOR_BUTTONS[0], Constants.COLOR_BUTTONS[1], Constants.COLOR_BUTTONS[2], 1f);
+            } else {
+                getMainPanel().getRenderer().setColor(0.65f, 0.65f, 0.65f, 0.9f);
+            }
+            getMainPanel().getRenderer().rect(bx, byy, barW, barH);
+        }
+
+        getMainPanel().getRenderer().setColor(1f, 1f, 1f, 1f);
+        getMainPanel().getRenderer().rect(playheadX - 1f, y + 2f, 2f, h - 4f);
+
+        getMainPanel().getRenderer().end();
+        Gdx.graphics.getGL20().glDisable(GL20.GL_BLEND);
     }
 
     private void drawGameObjectives() {
