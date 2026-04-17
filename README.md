@@ -7,7 +7,7 @@ No API keys required to get started — children can pick story elements and wri
 With optional API keys you unlock more magic, step by step:
 
 - **ChatGPT or Gemini API Key** — The AI generates unique stories and creates custom artwork for your characters in 12 different styles
-- **+ ElevenLabs API Key** — The story is read aloud with a configurable voice, with real-time word highlighting as you listen
+- **+ ElevenLabs API Key** — Stories are read aloud with a configurable voice, and generated songs get word-level lyric sync — both with real-time word highlighting as you listen
 - **+ Tonies Cloud Login** — Upload the audio directly to your Creative Tonie figure
 - **+ Suno API Key** — Generate original songs with lyrics, melodies, and multiple music styles
 
@@ -20,12 +20,14 @@ With optional API keys you unlock more magic, step by step:
 - **Text-to-Speech** — Convert stories to audio via ElevenLabs with configurable voice and model
 - **Tonie.box Integration** — Upload generated audio directly to a Creative Tonie
 - **Beautiful Book View** — Read stories in a handcrafted book layout with page-turning animations and word-by-word highlighting during playback
+- **Waveform Scrubbing** — Visual audio timeline with drag-to-seek; pages flip automatically to follow the audio position
 
 ### Songs
 - **AI-Powered Song Creation** — Generate original songs with lyrics and melody via Suno API
 - **8 Music Styles** — Pop, Rock, Country, HipHop, Lullaby, Folk, Electronic, Musical
 - **2 Versions per Song** — Every song is generated in two variations so you can pick your favorite
 - **Age-Appropriate Lyrics** — From simple lullabies with sound effects for babies to emotionally complex songs for teens
+- **Karaoke-Style Lyric Sync** — ElevenLabs Speech-to-Text forced alignment maps every sung word to the audio, so the displayed lyrics highlight in real time as the song plays
 
 ### Make It Yours
 - **Custom Characters & Objects** — Create your own entries with name, description, and image
@@ -36,7 +38,7 @@ With optional API keys you unlock more magic, step by step:
 
 ### General
 - **Multi-Language UI** — Available in: DE Deutsch, GB English, FR Francais, ES Espanol, IT Italiano, TR Turkce
-- **Cross-Platform** — Runs on Desktop (Windows, macOS, Linux) and Android
+- **Cross-Platform** — Runs on Desktop (Windows, macOS, Linux), Android, and iOS
 
 ## Screenshots
 
@@ -54,6 +56,7 @@ With optional API keys you unlock more magic, step by step:
 
 - **Java 8** or higher
 - **Android SDK** (API 27+) for Android builds
+- **macOS + Xcode + RoboVM** for iOS builds
 - API keys are **optional** — see [Configuration](#configuration) for details
 
 ## Getting Started
@@ -90,7 +93,7 @@ SUNO_API_KEY=your-suno-api-key
 |-----|----------|-------------|
 | `CHATGPT_API_KEY` | For OpenAI stories | [OpenAI API Key](https://platform.openai.com/api-keys) |
 | `GEMINI_API_KEY` | For Gemini stories | [Google AI Studio API Key](https://aistudio.google.com/apikey) |
-| `ELEVENLABS_API_KEY` | For TTS | [ElevenLabs API Key](https://elevenlabs.io/) |
+| `ELEVENLABS_API_KEY` | For TTS and lyric sync | [ElevenLabs API Key](https://elevenlabs.io/) — used for both Text-to-Speech (stories) and Speech-to-Text forced alignment (song lyrics) |
 | `ELEVENLABS_VOICE_ID` | For TTS | Voice ID from your ElevenLabs account |
 | `ELEVENLABS_MODEL_ID` | No (default: `eleven_multilingual_v2`) | ElevenLabs TTS model |
 | `TONIES_USERNAME` | For Tonie upload | Tonies Cloud login email |
@@ -113,6 +116,13 @@ SUNO_API_KEY=your-suno-api-key
 ./gradlew :android:installDebug
 ```
 
+**iOS** (requires macOS + Xcode):
+
+```bash
+./gradlew :ios:launchIPhoneSimulator   # run in simulator
+./gradlew :ios:createIPA                # build IPA for device
+```
+
 **Build Desktop JAR:**
 
 ```bash
@@ -128,7 +138,7 @@ The JAR will be created in `desktop/build/libs/`.
 - [OkHttp](https://square.github.io/okhttp/) — HTTP client
 - [Lombok](https://projectlombok.org/) — Boilerplate reduction
 - [toniebox-api](https://github.com/maximilianvoss/toniebox-api) — Tonie.box cloud connection (Apache License 2.0)
-- [ElevenLabs API](https://elevenlabs.io/) — Text-to-Speech
+- [ElevenLabs API](https://elevenlabs.io/) — Text-to-Speech (story narration) and Speech-to-Text forced alignment (song-lyric timing)
 - [OpenAI API](https://platform.openai.com/) — Story generation & image generation (GPT-5-mini, gpt-image-1-mini)
 - [Google Gemini API](https://ai.google.dev/) — Story generation & image generation (Gemini)
 - [Suno API](https://sunoapi.org/) — Song generation with lyrics and melody
@@ -140,6 +150,7 @@ AIStories/
 ├── core/           # Shared game logic (stories, songs, UI, entities)
 ├── desktop/        # Desktop launcher (LWJGL3)
 ├── android/        # Android launcher
+├── ios/            # iOS launcher (RoboVM)
 ├── assets/         # Images, fonts, translations, config
 │   ├── config.properties.sample
 │   ├── i18n/       # Localization files (6 languages)
