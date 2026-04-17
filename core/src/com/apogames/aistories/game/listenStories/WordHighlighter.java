@@ -38,9 +38,21 @@ public class WordHighlighter {
 
             String[] lineWords = line.split("\\s+");
             float xOffset = 0;
+            boolean inTag = false;
 
             for (String displayWord : lineWords) {
                 if (displayWord.isEmpty()) continue;
+
+                boolean isTagWord = inTag || displayWord.contains("[");
+                if (displayWord.contains("[")) inTag = true;
+                if (displayWord.contains("]")) inTag = false;
+
+                if (isTagWord) {
+                    Constants.glyphLayout.setText(font, displayWord + " ");
+                    xOffset += Constants.glyphLayout.width;
+                    continue;
+                }
+
                 if (ttsIndex >= ttsWords.size()) break;
 
                 Constants.glyphLayout.setText(font, displayWord);
@@ -48,13 +60,11 @@ public class WordHighlighter {
                 positions.add(new WordPosition(lineIdx, xOffset, wordWidth));
                 ttsIndex++;
 
-                // Advance xOffset by word width + space
                 Constants.glyphLayout.setText(font, displayWord + " ");
                 xOffset += Constants.glyphLayout.width;
             }
         }
 
-        // Fill remaining TTS words with no-position entries
         while (positions.size() < ttsWords.size()) {
             positions.add(new WordPosition(-1, 0, 0));
         }
@@ -67,6 +77,22 @@ public class WordHighlighter {
     public int getCurrentLine() {
         if (currentWordIndex < 0 || currentWordIndex >= positions.size()) return -1;
         return positions.get(currentWordIndex).lineIndex;
+    }
+
+    public int getLineForTime(float playbackSeconds) {
+        List<WordTimingData.WordTiming> words = timingData.getWords();
+        if (words.isEmpty()) return -1;
+        int target = -1;
+        for (int i = 0; i < words.size(); i++) {
+            if (words.get(i).getStartTime() <= playbackSeconds) {
+                target = i;
+            } else {
+                break;
+            }
+        }
+        if (target < 0) target = 0;
+        if (target >= positions.size()) return -1;
+        return positions.get(target).lineIndex;
     }
 
     public void renderHighlight(ShapeRenderer renderer, FontSize fontSize,

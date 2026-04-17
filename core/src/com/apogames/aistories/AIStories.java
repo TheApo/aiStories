@@ -28,7 +28,7 @@ public class AIStories extends Game {
 
     private void loadProperties() {
         if (!Gdx.files.internal("config.properties").exists()) {
-            System.out.println("config.properties not found - starting without API keys");
+            Gdx.app.log("config properties", "config.properties not found - starting without API keys");
             return;
         }
         Properties props = new Properties();

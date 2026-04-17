@@ -91,6 +91,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private int currentSpread = 0;
     private int pendingSpread = 0;
+    private int scrubTargetSpread = -1;
 
     private final BookRenderer bookRenderer;
     private final PageTurnAnimation pageAnimation = new PageTurnAnimation();
@@ -1002,7 +1003,27 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.playbackStartOffset = target;
         this.playbackStartNanos = wasPlaying ? System.nanoTime() : 0;
         this.lastRenderedSecond = -1;
+        jumpToSpreadForTime(target);
         Gdx.graphics.requestRendering();
+    }
+
+    private void jumpToSpreadForTime(float seconds) {
+        if (this.timingData == null) return;
+        if (this.highlighter == null) {
+            this.highlighter = new WordHighlighter(this.timingData);
+            rebuildHighlighterMapping();
+        }
+        int line = this.highlighter.getLineForTime(seconds);
+        if (line < 0) return;
+        int rowsPerPage = bookRenderer.getRowsPerPage(this.fontSize);
+        if (rowsPerPage <= 0) return;
+        int targetSpread = line / (2 * rowsPerPage);
+        if (targetSpread == this.currentSpread) {
+            this.scrubTargetSpread = -1;
+            return;
+        }
+        this.scrubTargetSpread = targetSpread;
+        Gdx.graphics.setContinuousRendering(true);
     }
 
     @Override
@@ -1101,11 +1122,15 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         this.highlighter = null;
         this.timingData = null;
 
-        // Delete song variant MP3s
+        // Delete song variant MP3s (and their word-timing JSONs)
         if (this.isSong && this.songVariantHandles != null) {
             for (FileHandle variant : this.songVariantHandles) {
                 WaveformLoader.deleteCache(variant);
                 deleteFileWithNio(variant.file());
+                File variantJson = Gdx.files.local(variant.path().replace(".mp3", ".json")).file();
+                if (variantJson.exists()) {
+                    deleteFileWithNio(variantJson);
+                }
             }
             this.songVariantHandles = null;
         } else if (this.choosenListenStory >= 0) {
@@ -1398,7 +1423,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         } catch (Exception e) {
             Gdx.app.log("ListenStories", "Could not read MP3 duration: " + e.getMessage());
         }
-        this.timingData = null;
+        String jsonPath = variantFile.path().replace(".mp3", ".json");
+        this.timingData = WordTimingData.loadFromFile(jsonPath);
+        if (this.timingData != null && this.timingData.getDuration() > 0) {
+            this.totalDuration = this.timingData.getDuration();
+        }
+        Gdx.app.log("ListenStories", "Word timing JSON " + (this.timingData != null ? "loaded (" + this.timingData.getWords().size() + " words)" : "not found") + " for " + variantFile.name());
         this.highlighter = null;
     }
 
@@ -1437,6 +1467,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void playMusic() {
         if (this.music != null) {
+            boolean fromStart = this.playbackStartOffset <= 0f;
             this.music.play();
             if (this.playbackStartOffset > 0f) {
                 this.music.setPosition(this.playbackStartOffset);
@@ -1447,6 +1478,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
                 this.highlighter = new WordHighlighter(this.timingData);
                 rebuildHighlighterMapping();
                 Gdx.app.log("ListenStories", "WordHighlighter created and mapping built");
+            }
+            if (fromStart && this.currentSpread != 0) {
+                this.scrubTargetSpread = 0;
             }
         }
         updateAudioButtonVisibility();
@@ -1506,6 +1540,15 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     @Override
     public void doThink(float delta) {
         this.textEditor.think((int) delta);
+
+        if (this.scrubTargetSpread >= 0 && !pageAnimation.isAnimating()) {
+            if (this.scrubTargetSpread == this.currentSpread) {
+                this.scrubTargetSpread = -1;
+            } else {
+                int dir = (this.scrubTargetSpread > this.currentSpread) ? 1 : -1;
+                nextPage(dir);
+            }
+        }
 
         if (this.music != null && this.music.isPlaying()) {
             float position = getPlaybackPosition();

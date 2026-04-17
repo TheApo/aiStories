@@ -33,8 +33,27 @@ public class DecorativeWaveform extends ApoEntity {
     public void setHeights(float[] newHeights) {
         if (newHeights == null) return;
         int n = Math.min(newHeights.length, heights.length);
+
+        float min = Float.POSITIVE_INFINITY;
+        float max = Float.NEGATIVE_INFINITY;
         for (int i = 0; i < n; i++) {
             float v = newHeights[i];
+            if (v < 0f) v = 0f;
+            if (v > 1f) v = 1f;
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+
+        boolean stretch = min > 0.2f && max > min;
+        float range = max - min;
+
+        for (int i = 0; i < n; i++) {
+            float v = newHeights[i];
+            if (v < 0f) v = 0f;
+            if (v > 1f) v = 1f;
+            if (stretch) {
+                v = 0.2f + (v - min) / range * 0.8f;
+            }
             if (v < 0.06f) v = 0.06f;
             if (v > 1.0f) v = 1.0f;
             heights[i] = v;

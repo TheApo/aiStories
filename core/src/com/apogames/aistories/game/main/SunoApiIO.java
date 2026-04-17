@@ -261,10 +261,12 @@ public class SunoApiIO {
         String finalLyrics = lyrics != null ? lyrics : "";
 
         // Download MP3s
+        List<String> mp3Paths = new ArrayList<>();
         for (int i = 0; i < audioUrls.size(); i++) {
             String suffix = (audioUrls.size() > 1) ? "_v" + (i + 1) : "";
             String mp3Path = Prompt.DIRECTORY + filePrefix + suffix + ".mp3";
             downloadMp3Sync(audioUrls.get(i), mp3Path);
+            mp3Paths.add(mp3Path);
         }
 
         if (hasExistingFile) {
@@ -287,6 +289,15 @@ public class SunoApiIO {
                 main.setFileHandle(txtFile);
                 main.setRunning(Running.NONE);
             });
+        }
+
+        // Fire-and-forget word-level alignment per variant (runs after UI is unblocked).
+        // Only if an ElevenLabs API key is configured - otherwise no highlighting, no request.
+        if (ElvenlabIO.API_KEY != null && !ElvenlabIO.API_KEY.isEmpty()) {
+            ForcedAlignmentIO aligner = new ForcedAlignmentIO();
+            for (String mp3Path : mp3Paths) {
+                aligner.alignAsync(Gdx.files.local(mp3Path), finalLyrics);
+            }
         }
     }
 
