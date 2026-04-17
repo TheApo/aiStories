@@ -1438,8 +1438,10 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private void playMusic() {
         if (this.music != null) {
             this.music.play();
+            if (this.playbackStartOffset > 0f) {
+                this.music.setPosition(this.playbackStartOffset);
+            }
             this.playbackStartNanos = System.nanoTime();
-            // playbackStartOffset is 0 after stop/load, or saved position after pause
             Gdx.graphics.setContinuousRendering(true);
             if (this.timingData != null && this.highlighter == null) {
                 this.highlighter = new WordHighlighter(this.timingData);
