@@ -296,7 +296,9 @@ public class SunoApiIO {
         if (ElvenlabIO.API_KEY != null && !ElvenlabIO.API_KEY.isEmpty()) {
             ForcedAlignmentIO aligner = new ForcedAlignmentIO();
             for (String mp3Path : mp3Paths) {
-                aligner.alignAsync(Gdx.files.local(mp3Path), finalLyrics);
+                final String jsonPath = mp3Path.replace(".mp3", ".json");
+                aligner.alignAsync(Gdx.files.local(mp3Path), finalLyrics,
+                        () -> main.onWordTimingReady(jsonPath));
             }
         }
     }

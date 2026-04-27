@@ -4,6 +4,7 @@ import com.apogames.aistories.Constants;
 import com.apogames.aistories.game.MainPanel;
 import com.apogames.asset.AssetLoader;
 import com.apogames.backend.DrawString;
+import com.apogames.common.Localization;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -109,17 +110,28 @@ public class BookRenderer {
         mainPanel.getRenderer().end();
     }
 
-    private static final String CHAPTER_WORDS_PATTERN = "(Kapitel|Chapter|Chapitre|Capitolo|Capítulo|Bölüm)";
+    private static String chapterWord() {
+        try {
+            String word = Localization.getInstance().getCommon().get("text_chapter");
+            if (word != null && !word.isEmpty() && !word.startsWith("???")) {
+                return word;
+            }
+        } catch (Exception ignored) {
+        }
+        return "Chapter";
+    }
 
     public static boolean isChapterHeading(String line) {
         if (line == null || line.trim().isEmpty()) return false;
         String trimmed = line.trim();
-        if (trimmed.matches("(?i)" + CHAPTER_WORDS_PATTERN + "\\s+.*")) return true;
+        String word = java.util.regex.Pattern.quote(chapterWord());
+        if (trimmed.matches("(?i)" + word + "\\s+.*")) return true;
         return trimmed.matches("^\\d+[.:;\\-–—]\\s+.*");
     }
 
     public static String stripChapterWord(String heading) {
-        return heading.replaceFirst("(?i)" + CHAPTER_WORDS_PATTERN + "\\s+", "");
+        String word = java.util.regex.Pattern.quote(chapterWord());
+        return heading.replaceFirst("(?i)" + word + "\\s+", "");
     }
 
     public void renderPageText(ArrayList<String> lines, int startLine, int rows, FontSize fontSize, boolean isLeftPage) {

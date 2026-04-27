@@ -121,6 +121,9 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
     private String statusText = "";
     private boolean reload = false;
 
+    private FileHandle currentMp3Handle = null;
+    private String nextWordTimingPath = null;
+
     public ListenStories(final MainPanel game) {
         super(game);
         this.bookRenderer = new BookRenderer(game);
@@ -455,7 +458,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         String[] lines = text.split("\n", -1);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < lines.length; i++) {
-            String original = lines[i].trim();
+            String original = lines[i].trim().replaceAll("\\*\\*", "");
             boolean isHeading = original.startsWith("#") || BookRenderer.isChapterHeading(original);
             String line = original.replaceAll("^#+\\s*", "").trim();
             if (BookRenderer.isChapterHeading(line)) {
@@ -816,6 +819,12 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         Gdx.graphics.requestRendering();
     }
 
+    @Override
+    public void onWordTimingReady(String jsonPath) {
+        this.nextWordTimingPath = jsonPath;
+        Gdx.graphics.requestRendering();
+    }
+
     private String extractTitleFromLyrics(String lyrics) {
         // Try to find a meaningful title from the first verse line (skip tags like [Verse 1])
         String[] lines = lyrics.split("\n");
@@ -871,7 +880,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         String fileName = Prompt.DIRECTORY + this.savedSongFilePrefix + ".txt";
         Gdx.app.log("SaveSongText", "saveSongText " + fileName);
         FileHandle fileHandle = Gdx.files.local(fileName);
-        fileHandle.writeString(header + text, false);
+        fileHandle.writeString(header + cleanText(text), false);
     }
 
     @Override
@@ -1282,6 +1291,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             this.music.dispose();
             this.music = null;
         }
+        this.currentMp3Handle = null;
         this.waveform = null;
         this.isScrubbing = false;
         this.totalDuration = 0f;
@@ -1348,6 +1358,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
 
     private void loadMusicFromFile(FileHandle fileHandle, String searchName) {
         this.music = Gdx.audio.newMusic(fileHandle);
+        this.currentMp3Handle = fileHandle;
         this.waveform = new DecorativeWaveform(ROW_BG_X + 5, WAVE_Y, ROW_BG_WIDTH - 10, WAVE_H, fileHandle.name());
         this.isScrubbing = false;
         this.scrubPosition = 0f;
@@ -1403,6 +1414,7 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
             }
         }
         this.music = Gdx.audio.newMusic(variantFile);
+        this.currentMp3Handle = variantFile;
         this.waveform = new DecorativeWaveform(ROW_BG_X + 5, WAVE_Y, ROW_BG_WIDTH - 10, WAVE_H, variantFile.name());
         this.isScrubbing = false;
         this.scrubPosition = 0f;
@@ -1674,6 +1686,45 @@ public class ListenStories extends SequentiallyThinkingScreenModel implements Ma
         if (this.reload) {
             reloadFileHandler(this.choosenReadStory);
             this.reload = false;
+            Gdx.graphics.requestRendering();
+        }
+
+        if (this.nextWordTimingPath != null) {
+            String path = this.nextWordTimingPath;
+            this.nextWordTimingPath = null;
+            applyWordTimingIfMatches(path);
+        }
+    }
+
+    private void applyWordTimingIfMatches(String jsonPath) {
+        if (this.timingData != null) return;
+        if (this.currentMp3Handle == null) return;
+
+        String expectedJsonPath = this.currentMp3Handle.path().replace(".mp3", ".json");
+        java.io.File incoming = Gdx.files.local(jsonPath).file();
+        java.io.File expected = Gdx.files.local(expectedJsonPath).file();
+        if (!incoming.getAbsoluteFile().equals(expected.getAbsoluteFile())) {
+            return;
+        }
+
+        WordTimingData loaded = WordTimingData.loadFromFile(jsonPath);
+        if (loaded == null || loaded.getWords() == null || loaded.getWords().isEmpty()) {
+            Gdx.app.log("ListenStories", "Word timing file empty or unreadable: " + jsonPath);
+            return;
+        }
+
+        this.timingData = loaded;
+        if (this.timingData.getDuration() > 0) {
+            this.totalDuration = this.timingData.getDuration();
+        }
+        Gdx.app.log("ListenStories", "Word timing applied live (" + loaded.getWords().size() + " words)");
+
+        if (this.music != null && this.music.isPlaying()) {
+            if (this.highlighter == null) {
+                this.highlighter = new WordHighlighter(this.timingData);
+                rebuildHighlighterMapping();
+            }
+            jumpToSpreadForTime(getPlaybackPosition());
             Gdx.graphics.requestRendering();
         }
     }

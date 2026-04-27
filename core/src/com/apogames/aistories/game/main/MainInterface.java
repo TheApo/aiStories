@@ -16,6 +16,8 @@ public interface MainInterface {
 
     void onImageReceived(String sectionIdentifier, String imageUrl);
 
+    default void onWordTimingReady(String jsonPath) {}
+
     Prompt getPrompt();
 
 }

@@ -23,30 +23,33 @@ public class ForcedAlignmentIO {
 
     private final Gson gson = new Gson();
 
-    public void alignAsync(FileHandle mp3, String lyrics) {
+    public void alignAsync(FileHandle mp3, String lyrics, Runnable onJsonSaved) {
         new Thread(() -> {
             try {
-                align(mp3, lyrics);
+                boolean saved = align(mp3, lyrics);
+                if (saved && onJsonSaved != null) {
+                    Gdx.app.postRunnable(onJsonSaved);
+                }
             } catch (Exception e) {
                 Gdx.app.error("ForcedAlignmentIO", "Alignment failed for " + mp3.name(), e);
             }
         }, "forced-alignment-" + mp3.name()).start();
     }
 
-    private void align(FileHandle mp3, String lyrics) throws Exception {
+    private boolean align(FileHandle mp3, String lyrics) throws Exception {
         if (ElvenlabIO.API_KEY == null || ElvenlabIO.API_KEY.isEmpty()) {
             Gdx.app.log("ForcedAlignmentIO", "No ElevenLabs API key - skipping alignment");
-            return;
+            return false;
         }
         if (!mp3.exists()) {
             Gdx.app.error("ForcedAlignmentIO", "MP3 not found: " + mp3.path());
-            return;
+            return false;
         }
 
         String cleanText = cleanLyrics(lyrics);
         if (cleanText.isEmpty()) {
             Gdx.app.log("ForcedAlignmentIO", "Empty lyrics - skipping alignment for " + mp3.name());
-            return;
+            return false;
         }
 
         String boundary = "----aistories" + System.currentTimeMillis();
@@ -70,20 +73,20 @@ public class ForcedAlignmentIO {
         if (code >= 400) {
             String err = readStream(conn.getErrorStream());
             Gdx.app.error("ForcedAlignmentIO", "HTTP " + code + " for " + mp3.name() + ": " + err);
-            return;
+            return false;
         }
 
         String response = readStream(conn.getInputStream());
-        parseAndSave(response, mp3);
+        return parseAndSave(response, mp3);
     }
 
     @SuppressWarnings("unchecked")
-    private void parseAndSave(String responseBody, FileHandle mp3) {
+    private boolean parseAndSave(String responseBody, FileHandle mp3) {
         Map<String, Object> response = gson.fromJson(responseBody, Map.class);
         List<Map<String, Object>> wordsRaw = (List<Map<String, Object>>) response.get("words");
         if (wordsRaw == null || wordsRaw.isEmpty()) {
             Gdx.app.log("ForcedAlignmentIO", "No words in response for " + mp3.name());
-            return;
+            return false;
         }
 
         List<WordTimingData.WordTiming> words = new ArrayList<>(wordsRaw.size());
@@ -100,12 +103,13 @@ public class ForcedAlignmentIO {
 
         if (words.isEmpty()) {
             Gdx.app.log("ForcedAlignmentIO", "No usable word timings for " + mp3.name());
-            return;
+            return false;
         }
 
         String jsonPath = mp3.path().replace(".mp3", ".json");
         new WordTimingData(words).saveToFile(jsonPath);
         Gdx.app.log("ForcedAlignmentIO", "Saved " + words.size() + " word timings -> " + jsonPath);
+        return true;
     }
 
     private byte[] buildMultipart(String boundary, String text, FileHandle mp3) throws Exception {
